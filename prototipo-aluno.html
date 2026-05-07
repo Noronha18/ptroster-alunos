@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTRoster — Portal do Aluno</title>
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #080808; min-height: 100vh; }
+    body {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: flex-start; padding: 40px 24px 60px;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    }
+    ::-webkit-scrollbar { display: none; }
+    * { -webkit-tap-highlight-color: transparent; scrollbar-width: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    @keyframes fadeIn      { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeInSlow  { from { opacity:0; } to { opacity:1; } }
+    @keyframes pulse       { 0%,100% { opacity:1; } 50% { opacity:0.80; } }
+    @keyframes confetti    { 0% { transform:translateY(0) rotate(0deg); opacity:1; } 100% { transform:translateY(-80px) rotate(720deg); opacity:0; } }
+    @keyframes pop         { 0% { transform:scale(0.72); opacity:0; } 100% { transform:scale(1); opacity:1; } }
+    @keyframes timerPulse  { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+    @keyframes slideUp     { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
+    @keyframes checkBounce { 0%{transform:scale(0)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
+    @keyframes shake       { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const C = {
+  bg:       '#0D0D0D',
+  card:     '#181818',
+  card2:    '#222222',
+  border:   'rgba(255,255,255,0.07)',
+  accent:   '#00FF7F',
+  accentBg: 'rgba(0,255,127,0.10)',
+  text:     '#FFFFFF',
+  muted:    '#888888',
+  muted2:   '#555555',
+  orange:   '#FF6B35',
+  orangeBg: 'rgba(255,107,53,0.10)',
+  danger:   '#FF453A',
+};
+
+/* ─── Dados ──────────────────────────────────────────────────────── */
+const STUDENT = {
+  name:'Lucas Ferreira', initials:'LF',
+  weight:81.5, height:178, bodyfat:14.2, lean:69.9,
+  streak:12, plan:'Hipertrofia · 5×/semana', personal:'Dr. Rafael Costa',
+  monthRecord:20, thisMonth:18,
+};
+const WEEK_DONE  = [true, true, true, false, false, false, false];
+const WEEK_LABEL = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+const TODAY_IDX  = 2;
+const TODAY_WORKOUT = {
+  name:'Peito + Tríceps', tag:'Treino B', day:'Hoje · 18:00', duration:'55 min',
+  exercises: [
+    { id:1, name:'Supino Reto',      muscle:'Peitoral Maior',
+      sets:[{n:1,reps:10,w:80,prev:77.5},{n:2,reps:10,w:80,prev:77.5},{n:3,reps:10,w:80,prev:80},{n:4,reps:8,w:80,prev:80}] },
+    { id:2, name:'Supino Inclinado', muscle:'Peitoral Superior',
+      sets:[{n:1,reps:12,w:60,prev:57.5},{n:2,reps:12,w:60,prev:57.5},{n:3,reps:10,w:60,prev:60}] },
+    { id:3, name:'Crucifixo',        muscle:'Peitoral / Alongamento',
+      sets:[{n:1,reps:15,w:14,prev:14},{n:2,reps:15,w:14,prev:14},{n:3,reps:12,w:14,prev:12.5}] },
+    { id:4, name:'Tríceps Corda',    muscle:'Tríceps — Cabeça Lateral',
+      sets:[{n:1,reps:12,w:35,prev:32.5},{n:2,reps:12,w:35,prev:32.5},{n:3,reps:12,w:35,prev:35},{n:4,reps:10,w:37.5,prev:35}] },
+    { id:5, name:'Tríceps Testa',    muscle:'Tríceps — Cabeça Longa',
+      sets:[{n:1,reps:10,w:25,prev:25},{n:2,reps:10,w:25,prev:25},{n:3,reps:8,w:27.5,prev:25}] },
+  ],
+};
+const HISTORY = [
+  { date:'Qua', name:'Peito + Tríceps',  vol:2840000, sets:17, active:true  },
+  { date:'Ter', name:'Costas + Bíceps',  vol:3120000, sets:20, active:false },
+  { date:'Seg', name:'Pernas',           vol:4560000, sets:22, active:false },
+  { date:'Sáb', name:'Ombro + Trapézio', vol:2210000, sets:15, active:false },
+  { date:'Sex', name:'Peito + Tríceps',  vol:2760000, sets:17, active:false },
+  { date:'Qui', name:'Costas + Bíceps',  vol:3040000, sets:19, active:false },
+  { date:'Qua', name:'Pernas',           vol:4410000, sets:22, active:false },
+  { date:'Ter', name:'Ombro + Trapézio', vol:2180000, sets:14, active:false },
+];
+const CHART_DATA = [
+  {wk:'S-1',vol:14200},{wk:'S-2',vol:15800},{wk:'S-3',vol:13400},{wk:'S-4',vol:16900},
+  {wk:'S-5',vol:15200},{wk:'S-6',vol:17600},{wk:'S-7',vol:16400},{wk:'S-8',vol:18200},
+];
+const GOALS = [
+  { label:'Peso corporal', current:81.5, target:85,  unit:'kg',      pct:72 },
+  { label:'Supino Reto',   current:80,   target:100, unit:'kg',      pct:60 },
+  { label:'Agachamento',   current:100,  target:140, unit:'kg',      pct:55 },
+  { label:'Treinos/mês',   current:18,   target:20,  unit:'treinos', pct:90 },
+];
+
+/* ─── IosFrame ────────────────────────────────────────────────────── */
+function IosFrame({ children, time='18:07', battery=78 }) {
+  return (
+    <div style={{
+      display:'inline-block', padding:12, background:'#000', borderRadius:60,
+      boxShadow:'0 0 0 2px #1f2937, 0 20px 60px rgba(0,0,0,0.7)',
+    }}>
+      <div style={{ width:393, height:852, borderRadius:48, overflow:'hidden', background:C.bg, position:'relative' }}>
+        <div style={{
+          position:'absolute', top:0, left:0, right:0, height:54,
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          padding:'0 32px', fontSize:15, fontWeight:600, color:'#fff',
+          zIndex:20, pointerEvents:'none',
+        }}>
+          <span>{time}</span>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <div style={{ display:'flex', alignItems:'flex-end', gap:2, height:12 }}>
+              {[4,6,9,11].map(h => <div key={h} style={{ width:3, height:h, background:'#fff', borderRadius:1 }}/>)}
+            </div>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+              <path d="M8 11.5a1 1 0 100-2 1 1 0 000 2z" fill="white"/>
+              <path d="M3 7.5a7 7 0 0110 0" stroke="white" strokeWidth="1.3" fill="none" strokeLinecap="round"/>
+              <path d="M1 4.5a11 11 0 0114 0" stroke="white" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.5"/>
+            </svg>
+            <div style={{ width:26, height:12, border:'1.5px solid rgba(255,255,255,0.8)', borderRadius:3, padding:1, position:'relative' }}>
+              <div style={{ width:`${battery}%`, height:'100%', background:'#fff', borderRadius:1, opacity:0.9 }}/>
+              <div style={{ position:'absolute', top:3, right:-3, width:2, height:6, background:'rgba(255,255,255,0.8)', borderRadius:'0 1px 1px 0' }}/>
+            </div>
+          </div>
+        </div>
+        <div style={{ position:'absolute', top:12, left:'50%', transform:'translateX(-50%)', width:124, height:36, background:'#000', borderRadius:999, zIndex:30 }}/>
+        <div style={{ position:'absolute', top:54, left:0, right:0, bottom:34, overflow:'hidden' }}>
+          {children}
+        </div>
+        <div style={{ position:'absolute', bottom:10, left:'50%', transform:'translateX(-50%)', width:140, height:5, background:'rgba(255,255,255,0.35)', borderRadius:999, zIndex:10 }}/>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Shared ─────────────────────────────────────────────────────── */
+function Tag({ children, color }) {
+  const clr = color || C.accent;
+  const isOrange = clr === C.orange;
+  return (
+    <span style={{
+      display:'inline-block', padding:'3px 10px', borderRadius:20,
+      fontSize:11, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase',
+      background: isOrange ? C.orangeBg : C.accentBg,
+      color: clr, border:`1px solid ${isOrange ? 'rgba(255,107,53,0.2)' : 'rgba(0,255,127,0.2)'}`,
+    }}>{children}</span>
+  );
+}
+
+function DumbbellIcon({ color='#fff', size=22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="2"  y="9"  width="3" height="6" rx="1.5" fill={color}/>
+      <rect x="6"  y="7"  width="3" height="10" rx="1.5" fill={color}/>
+      <rect x="15" y="7"  width="3" height="10" rx="1.5" fill={color}/>
+      <rect x="19" y="9"  width="3" height="6" rx="1.5" fill={color}/>
+      <rect x="9"  y="11" width="6" height="2" rx="1" fill={color}/>
+    </svg>
+  );
+}
+
+/* ─── CompletionModal ────────────────────────────────────────────── */
+function CompletionModal({ doneCnt, totalSets, onCheckin, onClose }) {
+  const vol = TODAY_WORKOUT.exercises.flatMap(e => e.sets).reduce((a,s) => a + s.reps * s.w, 0);
+  const colors = [C.accent,'#FFD700','#FF6B35','#00BFFF','#FF453A'];
+  return (
+    <div style={{
+      position:'absolute', inset:0, background:'rgba(0,0,0,0.88)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      zIndex:200, animation:'fadeIn 0.2s ease',
+    }}>
+      {Array.from({length:14},(_,i)=>i).map(i => (
+        <div key={i} style={{
+          position:'absolute', left:`${10+(i/14)*80}%`, top:`${20+(i%3)*15}%`,
+          width:i%2===0?8:5, height:i%2===0?8:5,
+          background:colors[i%colors.length], borderRadius:i%3===0?'50%':2,
+          animation:`confetti ${0.6+(i%3)*0.2}s ease-out ${i*0.05}s forwards`,
+        }}/>
+      ))}
+      <div style={{
+        background:C.card, borderRadius:24, padding:'28px 24px', width:320, textAlign:'center',
+        border:`1px solid rgba(255,255,255,0.1)`,
+        animation:'pop 0.35s cubic-bezier(0.16,1,0.3,1)',
+      }}>
+        <div style={{ fontSize:52, marginBottom:8 }}>🎉</div>
+        <h2 style={{ fontSize:24, fontWeight:800, color:C.text, marginBottom:4 }}>Treino Concluído!</h2>
+        <p style={{ fontSize:14, color:C.muted, marginBottom:20 }}>Excelente performance, Lucas!</p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:20 }}>
+          {[{label:'Séries',value:totalSets},{label:'Volume',value:`${(vol/1000).toFixed(1)} t`},{label:'Exerc.',value:TODAY_WORKOUT.exercises.length}].map((s,i) => (
+            <div key={i} style={{ background:C.card2, borderRadius:12, padding:'10px 8px' }}>
+              <p style={{ fontSize:18, fontWeight:700, color:C.accent }}>{s.value}</p>
+              <p style={{ fontSize:11, color:C.muted, marginTop:2 }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+        <button onClick={onCheckin} style={{ width:'100%', padding:'14px', background:C.accent, border:'none', borderRadius:12, fontSize:15, fontWeight:700, color:'#000', cursor:'pointer', marginBottom:8 }}>
+          Fazer Check-in ✓
+        </button>
+        <button onClick={onClose} style={{ width:'100%', padding:'10px', background:'none', border:`1px solid ${C.border}`, borderRadius:12, fontSize:14, color:C.muted, cursor:'pointer' }}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── RestTimer ──────────────────────────────────────────────────── */
+function RestTimer({ seconds, onSkip }) {
+  const pct = Math.round((seconds / 60) * 100);
+  const urgent = seconds <= 10;
+  return (
+    <div style={{
+      margin:'0 0 12px', padding:'12px 16px',
+      background: urgent ? 'rgba(255,107,53,0.12)' : C.accentBg,
+      border:`1px solid ${urgent ? 'rgba(255,107,53,0.4)' : 'rgba(0,255,127,0.2)'}`,
+      borderRadius:14, display:'flex', alignItems:'center', gap:14,
+      animation: urgent ? 'timerPulse 0.8s ease-in-out infinite' : 'slideUp 0.2s ease',
+    }}>
+      <div style={{ position:'relative', width:42, height:42, flexShrink:0 }}>
+        <svg width="42" height="42" viewBox="0 0 42 42" aria-hidden="true">
+          <circle cx="21" cy="21" r="18" fill="none" stroke={C.card2} strokeWidth="3"/>
+          <circle cx="21" cy="21" r="18" fill="none"
+            stroke={urgent ? C.orange : C.accent} strokeWidth="3"
+            strokeDasharray={`${2*Math.PI*18}`}
+            strokeDashoffset={`${2*Math.PI*18*(1-pct/100)}`}
+            strokeLinecap="round" transform="rotate(-90 21 21)"
+            style={{ transition:'stroke-dashoffset 1s linear' }}/>
+        </svg>
+        <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:urgent?C.orange:C.accent }}>{seconds}</span>
+      </div>
+      <div style={{ flex:1 }}>
+        <p style={{ fontSize:14, fontWeight:600, color:C.text }}>Descanso</p>
+        <p style={{ fontSize:12, color:C.muted }}>{urgent ? 'Prepare-se!' : 'Próxima série em breve'}</p>
+      </div>
+      <button onClick={onSkip} style={{ padding:'7px 14px', background:C.card2, border:`1px solid ${C.border}`, borderRadius:8, fontSize:12, fontWeight:600, color:C.muted, cursor:'pointer' }} aria-label="Pular descanso">
+        Pular
+      </button>
+    </div>
+  );
+}
+
+/* ─── LOGIN ───────────────────────────────────────────────────────── */
+function LoginScreen({ onLogin }) {
+  const [user, setUser]   = useState('');
+  const [pass, setPass]   = useState('');
+  const [err,  setErr]    = useState('');
+  const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!user.trim() || !pass.trim()) {
+      setErr('Preencha usuário e senha.');
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    setErr('');
+    setLoading(true);
+    setTimeout(() => { setLoading(false); onLogin(); }, 900);
+  }
+
+  const inputStyle = {
+    width:'100%', padding:'16px', background:'rgba(255,255,255,0.05)',
+    border:`1px solid rgba(255,255,255,0.1)`, borderRadius:16,
+    fontSize:16, fontWeight:500, color:C.text, outline:'none',
+    transition:'border-color 0.2s',
+  };
+
+  return (
+    <div style={{
+      background:C.bg, minHeight:'100%',
+      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+      padding:'40px 28px', animation:'fadeIn 0.3s ease',
+    }}>
+      {/* Marca */}
+      <div style={{ textAlign:'center', marginBottom:48 }}>
+        <div style={{
+          width:72, height:72, borderRadius:22, background:C.accent,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          margin:'0 auto 20px',
+        }}>
+          <DumbbellIcon color="#000" size={34}/>
+        </div>
+        <h1 style={{ fontSize:28, fontWeight:800, color:C.text, letterSpacing:'-0.02em' }}>PTRoster</h1>
+        <p style={{ fontSize:12, fontWeight:600, color:C.muted, marginTop:4, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+          Portal do Aluno
+        </p>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} style={{ width:'100%' }}>
+        {err && (
+          <div style={{
+            padding:'12px 16px', background:'rgba(255,69,58,0.1)',
+            border:'1px solid rgba(255,69,58,0.25)', borderRadius:12,
+            fontSize:13, color:C.danger, marginBottom:16, textAlign:'center',
+            animation: shake ? 'shake 0.4s ease' : 'none',
+          }}>{err}</div>
+        )}
+
+        <div style={{ marginBottom:12 }}>
+          <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8 }}>
+            CPF ou Usuário
+          </label>
+          <input
+            type="text" value={user}
+            onChange={e => setUser(e.target.value)}
+            placeholder="Ex.: 123.456.789-00"
+            style={inputStyle}
+            autoComplete="username"
+          />
+        </div>
+
+        <div style={{ marginBottom:24 }}>
+          <label style={{ display:'block', fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:8 }}>
+            Senha
+          </label>
+          <input
+            type="password" value={pass}
+            onChange={e => setPass(e.target.value)}
+            placeholder="••••••••"
+            style={inputStyle}
+            autoComplete="current-password"
+          />
+        </div>
+
+        <button type="submit" disabled={loading} style={{
+          width:'100%', padding:'18px',
+          background: loading ? 'rgba(0,255,127,0.55)' : C.accent,
+          border:'none', borderRadius:16,
+          fontSize:16, fontWeight:700, color:'#000',
+          cursor: loading ? 'default' : 'pointer',
+          transition:'opacity 0.2s',
+          animation: !loading ? 'pulse 2.5s ease-in-out infinite' : 'none',
+        }}>
+          {loading ? 'Entrando...' : 'Entrar no Treino →'}
+        </button>
+      </form>
+
+      <p style={{ marginTop:40, textAlign:'center', fontSize:11, fontWeight:500, color:C.muted2, lineHeight:1.7 }}>
+        Peça suas credenciais ao seu<br/>Personal Trainer responsável
+      </p>
+    </div>
+  );
+}
+
+/* ─── Dashboard ───────────────────────────────────────────────────── */
+function DashboardScreen({ onNav }) {
+  const toRecord = STUDENT.monthRecord - STUDENT.thisMonth;
+  return (
+    <div style={{ background:C.bg, minHeight:'100%', paddingBottom:16, animation:'fadeIn 0.25s ease' }}>
+
+      {/* Header — compacto, sem concorrer com o card */}
+      <div style={{ padding:'20px 20px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div>
+          <p style={{ fontSize:12, fontWeight:500, color:C.muted }}>Qua, 07 Mai · 🔥 {STUDENT.streak} dias</p>
+          <h1 style={{ fontSize:30, fontWeight:800, color:C.text, letterSpacing:'-0.02em', lineHeight:1.1, marginTop:2 }}>
+            Olá, Lucas
+          </h1>
+        </div>
+        <button onClick={() => onNav('perfil')} aria-label="Perfil"
+          style={{
+            width:44, height:44, borderRadius:'50%', border:'none', cursor:'pointer',
+            background:`linear-gradient(135deg, ${C.accent}, #00BFFF)`,
+            fontSize:15, fontWeight:700, color:'#000',
+            flexShrink:0,
+          }}>LF</button>
+      </div>
+
+      {/* CARD PRINCIPAL — hierarquia dominante */}
+      <div style={{ padding:'16px 20px 0' }}>
+        <div style={{ background:C.card, borderRadius:24, overflow:'hidden', border:`1px solid rgba(255,255,255,0.09)` }}>
+          {/* topo verde — assinatura visual de "treino de hoje" */}
+          <div style={{ background:'linear-gradient(135deg, rgba(0,255,127,0.15) 0%, rgba(0,255,127,0.04) 100%)', padding:'20px 20px 16px', borderBottom:`1px solid rgba(0,255,127,0.12)` }}>
+            <Tag>Treino de Hoje</Tag>
+            <h2 style={{ marginTop:12, fontSize:28, fontWeight:800, color:C.text, letterSpacing:'-0.02em', lineHeight:1.1 }}>
+              {TODAY_WORKOUT.name}
+            </h2>
+            <p style={{ fontSize:13, fontWeight:500, color:C.muted, marginTop:6 }}>
+              {TODAY_WORKOUT.day} · {TODAY_WORKOUT.duration}
+            </p>
+          </div>
+
+          {/* stats do treino */}
+          <div style={{ padding:'14px 20px', display:'flex' }}>
+            {[
+              {label:'Exercícios', value:TODAY_WORKOUT.exercises.length},
+              {label:'Séries',     value:17},
+              {label:'Estimado',   value:TODAY_WORKOUT.duration},
+            ].map((s,i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <div style={{ width:1, background:C.border, margin:'0 16px' }}/>}
+                <div>
+                  <p style={{ fontSize:10, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:5 }}>{s.label}</p>
+                  <p style={{ fontSize:22, fontWeight:700, color:C.text }}>{s.value}</p>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* CTA principal */}
+          <div style={{ padding:'0 20px 20px' }}>
+            <button onClick={() => onNav('treino')} style={{
+              width:'100%', padding:'18px', background:C.accent,
+              border:'none', borderRadius:14, fontSize:17, fontWeight:700,
+              color:'#000', cursor:'pointer', letterSpacing:'-0.01em',
+              animation:'pulse 2.5s ease-in-out infinite',
+            }} aria-label="Iniciar treino">
+              Iniciar Treino →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Semana — secundário, abaixo do fold */}
+      <div style={{ padding:'24px 20px 0' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <h3 style={{ fontSize:15, fontWeight:700, color:C.text }}>Esta Semana</h3>
+          <span style={{ fontSize:13, fontWeight:600, color:C.muted }}>3 / 5</span>
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between' }}>
+          {WEEK_LABEL.map((d,i) => {
+            const done = WEEK_DONE[i]; const isToday = i === TODAY_IDX;
+            return (
+              <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+                <div style={{
+                  width:40, height:40, borderRadius:'50%',
+                  background: done ? C.accent : (isToday ? C.accentBg : 'transparent'),
+                  border: isToday && !done ? `2px solid ${C.accent}` : done ? 'none' : `2px solid ${C.muted2}`,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontSize:13, fontWeight:700,
+                  color: done ? '#000' : isToday ? C.accent : C.muted2,
+                }} aria-label={done ? `${d} concluído` : isToday ? `${d} hoje` : d}>
+                  {done ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 5" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg> : d.charAt(0)}
+                </div>
+                <span style={{ fontSize:11, fontWeight:isToday?600:500, color:isToday?C.accent:C.muted2 }}>{d.slice(0,3)}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Últimos treinos — lista, sem cards */}
+      <div style={{ padding:'24px 20px 0' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <h3 style={{ fontSize:15, fontWeight:700, color:C.text }}>Últimos Treinos</h3>
+          <button onClick={() => onNav('historico')} style={{ background:'none', border:'none', fontSize:13, fontWeight:600, color:C.muted, cursor:'pointer' }}>
+            Ver todos
+          </button>
+        </div>
+        <div style={{ borderTop:`1px solid ${C.border}` }}>
+          {HISTORY.slice(1,4).map((w,i) => (
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 0', borderBottom:`1px solid ${C.border}` }}>
+              <div>
+                <p style={{ fontSize:14, fontWeight:600, color:C.text }}>{w.name}</p>
+                <p style={{ fontSize:12, color:C.muted, marginTop:2 }}>{w.date} · {w.sets} séries · {(w.vol/1000).toFixed(0)} kg</p>
+              </div>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3.5l3 3L8.5 2.5" stroke={C.accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {toRecord <= 3 && (
+        <div style={{ margin:'16px 20px 0' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 16px', background:C.accentBg, border:`1px solid rgba(0,255,127,0.15)`, borderRadius:14 }}>
+            <span>🎯</span>
+            <p style={{ fontSize:13, fontWeight:600, color:C.accent }}>Faltam {toRecord} treinos para bater seu recorde mensal!</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── TreinoScreen ────────────────────────────────────────────────── */
+function TreinoScreen({ onNav }) {
+  const [openId, setOpenId]                   = useState(1);
+  const [doneSets, setDoneSets]               = useState({});
+  const [restSecs, setRestSecs]               = useState(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [lastCompletedEx, setLastCompletedEx] = useState(null);
+  const timerRef = useRef(null);
+
+  const totalSets = TODAY_WORKOUT.exercises.reduce((a,e) => a + e.sets.length, 0);
+  const doneCnt   = Object.values(doneSets).filter(Boolean).length;
+  const pct       = Math.round((doneCnt / totalSets) * 100);
+
+  const milestoneMsg = pct>=75 ? '💪 Quase lá!' : pct>=50 ? '⚡ Metade, ótimo ritmo!' : pct>=25 ? '🔥 Aquecido!' : null;
+
+  useEffect(() => {
+    if (restSecs === null) return;
+    if (restSecs <= 0) { setRestSecs(null); return; }
+    timerRef.current = setTimeout(() => setRestSecs(s => s-1), 1000);
+    return () => clearTimeout(timerRef.current);
+  }, [restSecs]);
+
+  function toggleSet(exId, n) {
+    setDoneSets(prev => {
+      const key = `${exId}-${n}`; const nowDone = !prev[key];
+      if (nowDone) setRestSecs(60);
+      const next = { ...prev, [key]: nowDone };
+      const ex = TODAY_WORKOUT.exercises.find(e => e.id === exId);
+      if (ex) { const allDone = ex.sets.every(s => s.n===n ? nowDone : !!next[`${exId}-${s.n}`]); if (allDone) setLastCompletedEx(exId); }
+      if (Object.values(next).filter(Boolean).length === totalSets) { setRestSecs(null); setTimeout(() => setShowCelebration(true), 300); }
+      return next;
+    });
+  }
+  function isDone(exId, n) { return !!doneSets[`${exId}-${n}`]; }
+
+  return (
+    <div style={{ background:C.bg, minHeight:'100%', paddingBottom:16, animation:'fadeIn 0.25s ease', position:'relative' }}>
+      {showCelebration && <CompletionModal doneCnt={doneCnt} totalSets={totalSets} onCheckin={() => { setShowCelebration(false); onNav('checkin'); }} onClose={() => setShowCelebration(false)}/>}
+
+      <div style={{ padding:'20px 20px 0', background:'linear-gradient(180deg, rgba(0,255,127,0.05) 0%, transparent 100%)' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+          <Tag>{TODAY_WORKOUT.tag}</Tag>
+          <span style={{ fontSize:13, color:C.muted }}>⏱ {TODAY_WORKOUT.duration}</span>
+        </div>
+        <h1 style={{ fontSize:28, fontWeight:800, color:C.text, letterSpacing:'-0.02em', marginBottom:4 }}>{TODAY_WORKOUT.name}</h1>
+        <p style={{ fontSize:13, color:C.muted, marginBottom:14 }}>{TODAY_WORKOUT.exercises.length} exercícios · {totalSets} séries</p>
+
+        {/* Progress */}
+        <div style={{ marginBottom: restSecs!==null ? 0 : 20 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:C.muted }}>{milestoneMsg || `${doneCnt} / ${totalSets} séries`}</span>
+            <span style={{ fontSize:14, fontWeight:800, color: pct>0 ? C.accent : C.muted2 }}>{pct}%</span>
+          </div>
+          <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso"
+            style={{ height:8, background:C.card2, borderRadius:99, overflow:'hidden', marginBottom: restSecs!==null ? 14 : 20 }}>
+            <div style={{ height:'100%', width:'100%', background:C.accent, borderRadius:99, transform:`scaleX(${pct/100})`, transformOrigin:'left', transition:'transform 0.3s cubic-bezier(0.16,1,0.3,1)' }}/>
+          </div>
+        </div>
+        {restSecs !== null && <div style={{ marginBottom:16 }}><RestTimer seconds={restSecs} onSkip={() => setRestSecs(null)}/></div>}
+      </div>
+
+      <div style={{ padding:'4px 20px 0' }}>
+        {TODAY_WORKOUT.exercises.map((ex, idx) => {
+          const isOpen = openId === ex.id;
+          const exDoneCnt = ex.sets.filter(s => isDone(ex.id, s.n)).length;
+          const allDone = exDoneCnt === ex.sets.length;
+          const justDone = lastCompletedEx === ex.id;
+          return (
+            <div key={ex.id} style={{ marginBottom:8 }}>
+              <div onClick={() => setOpenId(isOpen ? null : ex.id)} role="button" aria-expanded={isOpen}
+                style={{
+                  display:'flex', justifyContent:'space-between', alignItems:'center',
+                  padding:'13px 16px', cursor:'pointer',
+                  background: allDone ? 'rgba(0,255,127,0.08)' : isOpen ? 'rgba(255,255,255,0.04)' : C.card,
+                  borderRadius: isOpen ? '14px 14px 0 0' : 14,
+                  border:`1px solid ${allDone ? 'rgba(0,255,127,0.25)' : isOpen ? 'rgba(255,255,255,0.1)' : C.border}`,
+                  borderBottom: isOpen ? '1px solid rgba(255,255,255,0.05)' : undefined,
+                  transition:'background 0.15s',
+                }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                  <div style={{
+                    width:34, height:34, borderRadius:10, flexShrink:0,
+                    background: allDone ? C.accentBg : C.card2,
+                    border:`1px solid ${allDone ? 'rgba(0,255,127,0.3)' : C.border}`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:13, fontWeight:700, color: allDone ? C.accent : C.muted,
+                    animation: justDone && allDone ? 'checkBounce 0.4s ease' : 'none',
+                  }}>
+                    {allDone ? <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3L11.5 4" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> : idx+1}
+                  </div>
+                  <div>
+                    <p style={{ fontSize:15, fontWeight:700, color:C.text }}>{ex.name}</p>
+                    <p style={{ fontSize:12, color:C.muted, marginTop:1 }}>{ex.muscle}</p>
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:allDone?C.accent:C.muted }}>{exDoneCnt}/{ex.sets.length}</span>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform:isOpen?'rotate(180deg)':'none', transition:'transform 0.2s' }}>
+                    <path d="M3 5l4 4 4-4" stroke={C.muted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+              {isOpen && (
+                <div style={{ background:C.card, border:'1px solid rgba(255,255,255,0.07)', borderTop:'none', borderRadius:'0 0 14px 14px' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'32px 1fr 1fr 1fr 48px', padding:'8px 16px', borderBottom:`1px solid ${C.border}` }}>
+                    {['#','Reps','Carga','Ant.','✓'].map((h,i) => (
+                      <span key={i} style={{ fontSize:11, fontWeight:600, color:C.muted2, textTransform:'uppercase', letterSpacing:'0.05em', textAlign:i>=2?'center':'left' }}>{h}</span>
+                    ))}
+                  </div>
+                  {ex.sets.map(s => {
+                    const done = isDone(ex.id, s.n); const isPR = s.w > s.prev; const isEq = s.w === s.prev;
+                    return (
+                      <div key={s.n} style={{ display:'grid', gridTemplateColumns:'32px 1fr 1fr 1fr 48px', padding:'11px 16px', alignItems:'center', borderBottom:`1px solid ${C.border}`, background:done?'rgba(0,255,127,0.04)':'transparent', transition:'background 0.2s' }}>
+                        <span style={{ fontSize:13, fontWeight:600, color:done?C.accent:C.muted }}>{s.n}</span>
+                        <span style={{ fontSize:16, fontWeight:700, color:done?C.accent:C.text }}>{s.reps}</span>
+                        <div style={{ textAlign:'center' }}>
+                          <span style={{ fontSize:16, fontWeight:700, color:done?C.accent:C.text }}>{s.w}</span>
+                          <span style={{ fontSize:11, color:C.muted }}> kg</span>
+                          {isPR && <div style={{ fontSize:10, color:C.accent, fontWeight:700, marginTop:1 }}>🏆 PR</div>}
+                        </div>
+                        <div style={{ textAlign:'center' }}>
+                          <span style={{ fontSize:13, fontWeight:500, color:isEq?C.muted:isPR?'rgba(0,255,127,0.6)':C.orange }}>{s.prev} kg</span>
+                          {isPR && <span style={{ fontSize:10, color:C.accent }}> ↑</span>}
+                        </div>
+                        <button onClick={() => toggleSet(ex.id, s.n)} aria-pressed={done}
+                          style={{ width:44, height:44, borderRadius:10, background:done?C.accent:C.card2, border:`1.5px solid ${done?C.accent:C.muted2}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.15s', justifySelf:'center' }}>
+                          {done && <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3L11.5 4" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {pct > 0 && (
+          <button onClick={() => setShowCelebration(true)} style={{
+            width:'100%', padding:'15px', marginTop:8,
+            background: pct===100 ? C.accent : C.card,
+            border:`1px solid ${pct===100?C.accent:C.border}`,
+            borderRadius:14, fontSize:15, fontWeight:700,
+            color: pct===100 ? '#000' : C.muted, cursor:'pointer', transition:'all 0.2s',
+          }}>
+            {pct===100 ? '🎉 Ver Resumo do Treino' : `Finalizar com ${pct}% concluído`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── CheckinScreen ──────────────────────────────────────────────── */
+function CheckinScreen({ onNav }) {
+  const [status, setStatus] = useState('idle');
+  function handleCheckin() { setStatus('loading'); setTimeout(() => setStatus('done'), 1200); }
+
+  if (status === 'done') return (
+    <div style={{ background:C.bg, minHeight:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 28px', animation:'fadeIn 0.25s ease' }}>
+      <div style={{ animation:'pop 0.4s cubic-bezier(0.16,1,0.3,1)', textAlign:'center' }}>
+        <div style={{ width:80, height:80, borderRadius:'50%', background:C.accentBg, border:`3px solid ${C.accent}`, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px' }}>
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M8 18l7 7L28 12" stroke={C.accent} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </div>
+        <h2 style={{ fontSize:26, fontWeight:800, color:C.text, marginBottom:8 }}>Presença Confirmada!</h2>
+        <p style={{ fontSize:14, color:C.muted, marginBottom:8 }}>Treino registrado com sucesso</p>
+        <p style={{ fontSize:13, fontWeight:700, color:C.accent, marginBottom:28 }}>🔥 Sequência de {STUDENT.streak+1} dias!</p>
+        <div style={{ background:C.card, borderRadius:16, padding:'16px', border:`1px solid ${C.border}`, marginBottom:24 }}>
+          <p style={{ fontSize:13, color:C.muted, marginBottom:4 }}>Qua, 07 Mai · 18:09</p>
+          <p style={{ fontSize:16, fontWeight:700, color:C.text }}>{TODAY_WORKOUT.name}</p>
+          <p style={{ fontSize:13, color:C.muted, marginTop:4 }}>Personal: {STUDENT.personal}</p>
+        </div>
+        <button onClick={() => onNav('dashboard')} style={{ width:'100%', padding:'15px', background:C.accent, border:'none', borderRadius:14, fontSize:16, fontWeight:700, color:'#000', cursor:'pointer' }}>
+          Voltar ao Início
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background:C.bg, minHeight:'100%', paddingBottom:16, animation:'fadeIn 0.25s ease' }}>
+      <div style={{ padding:'24px 20px 0' }}>
+        <h1 style={{ fontSize:28, fontWeight:800, color:C.text, letterSpacing:'-0.02em', marginBottom:4 }}>Check-in</h1>
+        <p style={{ fontSize:14, color:C.muted }}>Confirme sua presença de hoje</p>
+      </div>
+      <div style={{ margin:'16px 20px 0', background:C.card, borderRadius:20, padding:'20px', border:`1px solid ${C.border}` }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+          <div>
+            <p style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:'uppercase', letterSpacing:'0.05em' }}>Treino de Hoje</p>
+            <p style={{ fontSize:20, fontWeight:800, color:C.text, marginTop:4 }}>{TODAY_WORKOUT.name}</p>
+            <p style={{ fontSize:13, color:C.muted, marginTop:2 }}>Qua, 07 Mai · 18:07</p>
+          </div>
+          <Tag>Treino B</Tag>
+        </div>
+        <div style={{ display:'flex', gap:24, borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+          {[{label:'Personal',value:STUDENT.personal},{label:'Sequência',value:`${STUDENT.streak} dias 🔥`}].map((s,i) => (
+            <div key={i}>
+              <p style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em' }}>{s.label}</p>
+              <p style={{ fontSize:13, fontWeight:600, color:C.text, marginTop:2 }}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ margin:'8px 20px 0', background:C.card, borderRadius:16, padding:'16px', border:`1px solid ${C.border}` }}>
+        <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+          <div style={{ width:38, height:38, borderRadius:10, background:C.accentBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div>
+            <p style={{ fontSize:14, fontWeight:700, color:C.text }}>Academia FitZone</p>
+            <p style={{ fontSize:12, color:C.muted, marginTop:1 }}>Av. Paulista, 1000 — São Paulo</p>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding:'24px 20px 0' }}>
+        <button onClick={handleCheckin} disabled={status==='loading'} style={{
+          width:'100%', padding:'18px', borderRadius:16, border:'none',
+          background: status==='loading' ? 'rgba(0,255,127,0.6)' : C.accent,
+          fontSize:17, fontWeight:700, color:'#000',
+          cursor: status==='loading' ? 'default' : 'pointer', transition:'opacity 0.2s',
+        }}>
+          {status==='loading' ? '⏳ Confirmando...' : '✓ Confirmar Presença'}
+        </button>
+        <p style={{ textAlign:'center', fontSize:12, color:C.muted, marginTop:12 }}>
+          Sua presença será registrada para o Dr. Rafael Costa
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Histórico ───────────────────────────────────────────────────── */
+function HistoricoScreen({ onNav }) {
+  const [activePoint, setActivePoint] = useState(null);
+  const W = 353, H = 140;
+  const maxVol = Math.max(...CHART_DATA.map(d => d.vol));
+  const pts = CHART_DATA.map((d,i) => {
+    const x = (i/(CHART_DATA.length-1))*(W-24)+12;
+    const y = H - ((d.vol/maxVol)*(H-32)) - 16;
+    return [x, y];
+  });
+  const linePath = pts.map((p,i) => (i===0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+  const areaPath = `${linePath} L${pts[pts.length-1][0]},${H} L${pts[0][0]},${H} Z`;
+
+  return (
+    <div style={{ background:C.bg, minHeight:'100%', paddingBottom:16, animation:'fadeIn 0.25s ease' }}>
+      <div style={{ padding:'24px 20px 0' }}>
+        <h1 style={{ fontSize:28, fontWeight:800, color:C.text, letterSpacing:'-0.02em', marginBottom:4 }}>Histórico</h1>
+        <p style={{ fontSize:14, color:C.muted }}>Últimas 8 semanas</p>
+      </div>
+      <div style={{ margin:'16px 20px 0', background:C.card, borderRadius:22, padding:'18px 20px', border:`1px solid ${C.border}` }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+          <div>
+            <p style={{ fontSize:11, fontWeight:600, color:C.muted, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Volume Semanal</p>
+            <p style={{ fontSize:30, fontWeight:700, color:C.text }}>
+              {activePoint !== null ? CHART_DATA[activePoint].vol.toLocaleString('pt-BR') : '18.200'}
+              <span style={{ fontSize:14, color:C.muted }}> kg</span>
+            </p>
+            {activePoint !== null && <p style={{ fontSize:11, color:C.muted, marginTop:2 }}>{CHART_DATA[activePoint].wk}</p>}
+          </div>
+          <Tag>↑ +10.8%</Tag>
+        </div>
+        <svg width={W} height={H} style={{ overflow:'visible', display:'block' }} role="img" aria-label="Gráfico de volume semanal">
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={C.accent} stopOpacity="0.2"/>
+              <stop offset="100%" stopColor={C.accent} stopOpacity="0.01"/>
+            </linearGradient>
+          </defs>
+          {[0.33,0.66,1].map(f => (
+            <line key={f} x1="12" x2={W-12} y1={H-f*(H-32)-16} y2={H-f*(H-32)-16} stroke="rgba(255,255,255,0.05)" strokeWidth="1"/>
+          ))}
+          <path d={areaPath} fill="url(#areaGrad)"/>
+          <path d={linePath} fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          {pts.map(([x,y],i) => (
+            <g key={i} style={{ cursor:'pointer' }} onClick={() => setActivePoint(activePoint===i ? null : i)}>
+              <circle cx={x} cy={y} r="22" fill="transparent"/>
+              <circle cx={x} cy={y} r={activePoint===i?6:4.5} fill={C.bg} stroke={C.accent} strokeWidth="2.5" style={{ transition:'r 0.15s' }}/>
+              {i===pts.length-1 && <circle cx={x} cy={y} r="9" fill="none" stroke={C.accent} strokeWidth="1.5" opacity="0.3"/>}
+              {activePoint===i && (
+                <g>
+                  <rect x={x-28} y={y-34} width={56} height={22} rx={6} fill={C.card} stroke="rgba(0,255,127,0.3)" strokeWidth="1"/>
+                  <text x={x} y={y-19} textAnchor="middle" fill={C.accent} fontSize="11" fontWeight="700">{(CHART_DATA[i].vol/1000).toFixed(1)}t</text>
+                </g>
+              )}
+            </g>
+          ))}
+        </svg>
+        <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, padding:'0 12px' }}>
+          {CHART_DATA.map((d,i) => (
+            <span key={i} style={{ fontSize:11, color:i===CHART_DATA.length-1?C.accent:C.muted2, fontWeight:i===CHART_DATA.length-1?700:500 }}>{d.wk}</span>
+          ))}
+        </div>
+      </div>
+      <div style={{ margin:'16px 20px 0', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+        {[{label:'Treinos',value:'18',hi:false},{label:'Média kg/sem',value:'15.8k',hi:false},{label:'Recorde',value:'18.2k',hi:true}].map((s,i) => (
+          <div key={i} style={{ background:C.card, borderRadius:14, padding:'14px 12px', border:`1px solid ${C.border}` }}>
+            <p style={{ fontSize:22, fontWeight:700, color:s.hi?C.accent:C.text }}>{s.value}</p>
+            <p style={{ fontSize:11, fontWeight:500, color:C.muted, textTransform:'uppercase', letterSpacing:'0.04em', marginTop:4 }}>{s.label}</p>
+          </div>
+        ))}
+      </div>
+      <div style={{ padding:'24px 20px 0' }}>
+        <h3 style={{ fontSize:15, fontWeight:700, color:C.text, marginBottom:12 }}>Registro de Treinos</h3>
+        {HISTORY.map((w,i) => (
+          <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 16px', borderRadius:14, marginBottom:8, background:w.active?'rgba(0,255,127,0.06)':C.card, border:`1px solid ${w.active?'rgba(0,255,127,0.18)':C.border}` }}>
+            <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+              <div style={{ width:38, height:38, borderRadius:11, background:w.active?C.accentBg:C.card2, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }} aria-hidden="true">{w.active?'⚡':'✓'}</div>
+              <div>
+                <p style={{ fontSize:14, fontWeight:700, color:C.text }}>{w.name}</p>
+                <p style={{ fontSize:12, color:C.muted, marginTop:2 }}>{w.date} · {w.sets} séries · {(w.vol/1000).toFixed(0)} kg</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Perfil ──────────────────────────────────────────────────────── */
+function PerfilScreen({ onNav }) {
+  return (
+    <div style={{ background:C.bg, minHeight:'100%', paddingBottom:16, animation:'fadeIn 0.25s ease' }}>
+      <div style={{ padding:'24px 20px 20px', background:'linear-gradient(180deg, rgba(0,255,127,0.05) 0%, transparent 100%)', borderBottom:`1px solid ${C.border}` }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+          <div style={{ width:72, height:72, borderRadius:'50%', flexShrink:0, background:`linear-gradient(135deg, ${C.accent}, #00BFFF)`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, fontWeight:800, color:'#000', boxShadow:`0 0 0 3px ${C.bg}, 0 0 0 5px rgba(255,255,255,0.1)` }} role="img" aria-label="Avatar">LF</div>
+          <div>
+            <h1 style={{ fontSize:22, fontWeight:800, color:C.text }}>{STUDENT.name}</h1>
+            <p style={{ fontSize:13, color:C.muted, marginTop:2 }}>{STUDENT.plan}</p>
+            <p style={{ fontSize:12, color:C.muted, marginTop:3 }}>Personal: {STUDENT.personal}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Bio stats — linha horizontal sem cards */}
+      <div style={{ margin:'0 20px', borderBottom:`1px solid ${C.border}`, display:'flex' }}>
+        {[{label:'Peso',value:STUDENT.weight,unit:'kg'},{label:'Altura',value:STUDENT.height,unit:'cm'},{label:'G.Corp.',value:STUDENT.bodyfat,unit:'%'},{label:'Massa M',value:STUDENT.lean,unit:'kg'}].map((s,i) => (
+          <React.Fragment key={i}>
+            {i>0 && <div style={{ width:1, background:C.border, margin:'16px 0' }}/>}
+            <div style={{ flex:1, padding:'16px 0', textAlign:'center' }}>
+              <p style={{ fontSize:18, fontWeight:700, color:C.text }}>{s.value}</p>
+              <p style={{ fontSize:11, color:C.muted2, marginTop:2 }}>{s.unit}</p>
+              <p style={{ fontSize:11, color:C.muted, marginTop:1 }}>{s.label}</p>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div style={{ margin:'16px 20px 0', display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        <div style={{ background:C.orangeBg, border:'1px solid rgba(255,107,53,0.2)', borderRadius:18, padding:'16px' }}>
+          <p style={{ fontSize:28 }}>🔥</p>
+          <p style={{ fontSize:30, fontWeight:700, color:C.orange, marginTop:6, lineHeight:1 }}>{STUDENT.streak}</p>
+          <p style={{ fontSize:12, color:C.muted, marginTop:4 }}>dias seguidos</p>
+        </div>
+        <div style={{ background:C.accentBg, border:'1px solid rgba(0,255,127,0.15)', borderRadius:18, padding:'16px' }}>
+          <p style={{ fontSize:28 }}>🏆</p>
+          <p style={{ fontSize:30, fontWeight:700, color:C.accent, marginTop:6, lineHeight:1 }}>{STUDENT.thisMonth}</p>
+          <p style={{ fontSize:12, color:C.muted, marginTop:4 }}>treinos em Mai.</p>
+        </div>
+      </div>
+
+      <div style={{ padding:'24px 20px 0' }}>
+        <h3 style={{ fontSize:15, fontWeight:700, color:C.text, marginBottom:12 }}>Metas Pessoais</h3>
+        {GOALS.map((g,i) => {
+          const barColor = g.pct>=80 ? C.accent : g.pct>=50 ? C.orange : '#555';
+          const barIcon  = g.pct>=80 ? '✓' : g.pct>=50 ? '→' : '…';
+          return (
+            <div key={i} style={{ background:C.card, borderRadius:14, padding:'16px', marginBottom:8, border:`1px solid ${C.border}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                <div>
+                  <p style={{ fontSize:14, fontWeight:700, color:C.text }}>{g.label}</p>
+                  <p style={{ fontSize:12, color:C.muted, marginTop:2 }}>{g.current} {g.unit} <span style={{ color:C.muted2 }}>/ {g.target} {g.unit}</span></p>
+                </div>
+                <span style={{ fontSize:16, fontWeight:700, color:barColor }}>{barIcon} {g.pct}%</span>
+              </div>
+              <div role="progressbar" aria-valuenow={g.pct} aria-valuemin={0} aria-valuemax={100}
+                style={{ height:6, background:C.card2, borderRadius:99, overflow:'hidden' }}>
+                <div style={{ height:'100%', width:'100%', background:barColor, borderRadius:99, transform:`scaleX(${g.pct/100})`, transformOrigin:'left', transition:'transform 0.5s cubic-bezier(0.16,1,0.3,1)' }}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ─── TabBar ──────────────────────────────────────────────────────── */
+const TABS = [
+  { id:'dashboard', label:'Início',   icon: a => <svg width="22" height="22" viewBox="0 0 24 24" fill={a?C.accent:C.muted}><rect x="3" y="3" width="8" height="8" rx="2.5"/><rect x="13" y="3" width="8" height="8" rx="2.5"/><rect x="3" y="13" width="8" height="8" rx="2.5"/><rect x="13" y="13" width="8" height="8" rx="2.5"/></svg> },
+  { id:'treino',    label:'Treino',   icon: a => <DumbbellIcon color={a?C.accent:C.muted} size={22}/> },
+  { id:'checkin',   label:'Check-in', icon: a => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.accent:C.muted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg> },
+  { id:'historico', label:'Histórico',icon: a => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.accent:C.muted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
+  { id:'perfil',    label:'Perfil',   icon: a => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?C.accent:C.muted} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+];
+
+function TabBar({ active, onChange }) {
+  return (
+    <nav aria-label="Navegação principal" style={{ position:'absolute', bottom:0, left:0, right:0, height:66, background:'rgba(15,15,15,0.97)', backdropFilter:'blur(24px)', borderTop:`1px solid ${C.border}`, display:'flex', alignItems:'stretch', zIndex:50 }}>
+      {TABS.map(tab => {
+        const isActive = active === tab.id;
+        return (
+          <button key={tab.id} onClick={() => onChange(tab.id)} aria-label={tab.label} aria-current={isActive?'page':undefined}
+            style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, background:'none', border:'none', cursor:'pointer', padding:'6px 0 0', position:'relative' }}>
+            {isActive && <div style={{ position:'absolute', top:0, left:'50%', transform:'translateX(-50%)', width:28, height:2.5, background:C.accent, borderRadius:'0 0 2px 2px' }}/>}
+            {tab.icon(isActive)}
+            <span style={{ fontSize:10, fontWeight:isActive?700:500, color:isActive?C.accent:C.muted, letterSpacing:'0.02em' }}>{tab.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/* ─── AppPhone ────────────────────────────────────────────────────── */
+function AppPhone() {
+  const [screen, setScreen]   = useState('login');
+  const [visible, setVisible] = useState(true);
+
+  function navigate(to) {
+    if (to === screen) return;
+    setVisible(false);
+    setTimeout(() => { setScreen(to); setVisible(true); }, 130);
+  }
+
+  const isLogin = screen === 'login';
+
+  const screens = {
+    login:     () => <LoginScreen onLogin={() => navigate('dashboard')}/>,
+    dashboard: () => <DashboardScreen onNav={navigate}/>,
+    treino:    () => <TreinoScreen    onNav={navigate}/>,
+    checkin:   () => <CheckinScreen   onNav={navigate}/>,
+    historico: () => <HistoricoScreen onNav={navigate}/>,
+    perfil:    () => <PerfilScreen    onNav={navigate}/>,
+  };
+
+  const Content = screens[screen] || screens.dashboard;
+
+  return (
+    <IosFrame>
+      <div style={{ position:'relative', height:'100%', overflow:'hidden' }}>
+        <div style={{
+          position:'absolute', top:0, left:0, right:0, bottom: isLogin ? 0 : 66,
+          overflowY:'auto', overflowX:'hidden',
+          opacity: visible ? 1 : 0,
+          transition:'opacity 0.13s ease',
+        }} role="main">
+          <Content/>
+        </div>
+        {!isLogin && <TabBar active={screen} onChange={navigate}/>}
+      </div>
+    </IosFrame>
+  );
+}
+
+/* ─── App ─────────────────────────────────────────────────────────── */
+function App() {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', width:'100%' }}>
+      <div style={{ marginBottom:28, textAlign:'center' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10, marginBottom:6 }}>
+          <DumbbellIcon color={C.accent} size={22}/>
+          <h1 style={{ color:'#fff', fontSize:20, fontWeight:800, letterSpacing:'-0.02em' }}>
+            PTRoster <span style={{ color:C.accent }}>·</span> Portal do Aluno
+          </h1>
+        </div>
+        <p style={{ color:'#444', fontSize:13, fontWeight:500 }}>v4 · login + redesenho · 6 telas</p>
+      </div>
+      <AppPhone/>
+      <div style={{ marginTop:20, display:'flex', gap:6, flexWrap:'wrap', justifyContent:'center' }}>
+        {['Login','Dashboard','Treino + Timer','Check-in','Histórico','Perfil'].map((l,i) => (
+          <span key={i} style={{ fontSize:12, color:'#555', background:'#1A1A1A', padding:'4px 12px', borderRadius:20, border:'1px solid #2A2A2A', fontWeight:500 }}>{l}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
+</body>
+</html>
