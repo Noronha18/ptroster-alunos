@@ -4,7 +4,7 @@ import { useAluno } from '../hooks/useAluno';
 function GrupoTag({ grupo }) {
   if (!grupo) return null;
   return (
-    <span className="text-[10px] font-bold text-ios-blue bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wide">
+    <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md uppercase tracking-wide">
       {grupo}
     </span>
   );
@@ -13,23 +13,23 @@ function GrupoTag({ grupo }) {
 function ExercicioRow({ prescricao, numero }) {
   return (
     <div className="flex items-start gap-3 py-3 border-b border-ios-border last:border-0">
-      <div className="w-8 h-8 bg-ios-gray rounded-xl flex items-center justify-center font-black text-ios-text-secondary text-sm shrink-0 mt-0.5">
+      <div className="w-8 h-8 bg-card2 rounded-xl flex items-center justify-center font-black text-ios-text-secondary text-sm shrink-0 mt-0.5">
         {numero}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-gray-900 leading-tight truncate">
+        <p className="font-bold text-white leading-tight truncate">
           {prescricao.nome_exercicio || `Exercício ${prescricao.exercicio_id}`}
         </p>
         <div className="flex flex-wrap gap-1.5 mt-1.5">
-          <span className="text-xs font-bold text-gray-600 bg-ios-gray px-2 py-0.5 rounded-md">
+          <span className="text-xs font-bold text-white/60 bg-card2 px-2 py-0.5 rounded-md">
             {prescricao.series}x{prescricao.repeticoes}
           </span>
           {prescricao.carga && (
-            <span className="text-xs font-bold text-gray-600 bg-ios-gray px-2 py-0.5 rounded-md">
+            <span className="text-xs font-bold text-white/60 bg-card2 px-2 py-0.5 rounded-md">
               {prescricao.carga}
             </span>
           )}
-          <span className="text-xs font-bold text-ios-blue bg-blue-50 px-2 py-0.5 rounded-md">
+          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
             {prescricao.descanso}s descanso
           </span>
         </div>
@@ -42,17 +42,17 @@ function TreinoCard({ treino, defaultOpen }) {
   const [aberto, setAberto] = useState(defaultOpen);
 
   return (
-    <div className="bg-white rounded-2xl border border-ios-border overflow-hidden mb-3">
+    <div className="bg-card rounded-2xl border border-ios-border overflow-hidden mb-3">
       <button
         onClick={() => setAberto(a => !a)}
-        className="w-full flex items-center justify-between p-5 active:bg-ios-gray transition-colors"
+        className="w-full flex items-center justify-between p-5 active:bg-card2 transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
             <span className="text-sm font-black text-primary">{treino.nome.charAt(0)}</span>
           </div>
           <div className="text-left">
-            <p className="font-black text-gray-900">{treino.nome}</p>
+            <p className="font-black text-white">{treino.nome}</p>
             <p className="text-xs text-ios-text-secondary font-medium">
               {treino.prescricoes?.length ?? 0} exercícios
             </p>
@@ -106,7 +106,7 @@ export default function Treinos() {
   return (
     <div className="min-h-screen bg-ios-background px-4 pt-14 pb-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight">Meus Treinos</h1>
+        <h1 className="text-3xl font-black text-white tracking-tight">Meus Treinos</h1>
         {planoAtivo && (
           <p className="text-ios-text-secondary text-sm font-bold uppercase tracking-widest mt-1">
             {planoAtivo.titulo}
@@ -115,7 +115,7 @@ export default function Treinos() {
       </div>
 
       {!planoAtivo ? (
-        <div className="bg-white rounded-2xl border border-ios-border p-8 text-center">
+        <div className="bg-card rounded-2xl border border-ios-border p-8 text-center">
           <p className="text-ios-text-secondary font-medium">Nenhum plano ativo no momento.</p>
           <p className="text-xs text-ios-text-secondary mt-1">Fale com seu personal trainer.</p>
         </div>
@@ -126,11 +126,11 @@ export default function Treinos() {
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-[10px] font-black text-primary uppercase tracking-widest">Plano atual</p>
-                <p className="font-black text-gray-900 mt-0.5">{planoAtivo.titulo}</p>
+                <p className="font-black text-white mt-0.5">{planoAtivo.titulo}</p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] font-black text-ios-text-secondary uppercase tracking-widest">Duração</p>
-                <p className="font-black text-gray-900">{planoAtivo.duracao_semanas} sem.</p>
+                <p className="font-black text-white">{planoAtivo.duracao_semanas} sem.</p>
               </div>
             </div>
             {planoAtivo.objetivo_estrategico && (
@@ -146,7 +146,7 @@ export default function Treinos() {
               <TreinoCard key={treino.id} treino={treino} defaultOpen={idx === 0} />
             ))
           ) : (
-            <div className="bg-white rounded-2xl border border-ios-border p-8 text-center">
+            <div className="bg-card rounded-2xl border border-ios-border p-8 text-center">
               <p className="text-ios-text-secondary font-medium">Nenhum treino no plano ainda.</p>
             </div>
           )}
