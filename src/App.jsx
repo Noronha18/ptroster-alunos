@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Treinos from './pages/Treinos';
 import Checkin from './pages/Checkin';
 import Historico from './pages/Historico';
+import Perfil from './pages/Perfil';
 
 function ProtectedLayout({ children }) {
   const { user, loading } = useAuth();
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/treinos" element={<ProtectedLayout><Treinos /></ProtectedLayout>} />
       <Route path="/checkin" element={<ProtectedLayout><Checkin /></ProtectedLayout>} />
       <Route path="/historico" element={<ProtectedLayout><Historico /></ProtectedLayout>} />
+      <Route path="/perfil" element={<ProtectedLayout><Perfil /></ProtectedLayout>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

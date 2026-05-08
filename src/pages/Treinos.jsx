@@ -1,91 +1,306 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
 
-function GrupoTag({ grupo }) {
-  if (!grupo) return null;
+/* ─── RestTimer ─────────────────────────────────────── */
+function RestTimer({ seconds, total, onSkip }) {
+  const pct    = total > 0 ? seconds / total : 0;
+  const R      = 18;
+  const circ   = 2 * Math.PI * R;
+  const urgent = seconds <= 10;
+
   return (
-    <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md uppercase tracking-wide">
-      {grupo}
-    </span>
+    <div
+      className="flex items-center gap-3 p-3 rounded-2xl mb-3"
+      style={{
+        background: urgent ? 'rgba(255,107,53,0.12)' : 'rgba(0,255,127,0.08)',
+        border: `1px solid ${urgent ? 'rgba(255,107,53,0.4)' : 'rgba(0,255,127,0.2)'}`,
+        animation: urgent ? 'timerPulse 0.8s ease-in-out infinite' : 'slideUp 0.2s ease',
+      }}
+    >
+      <div className="relative w-11 h-11 shrink-0">
+        <svg width="44" height="44" viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r={R} fill="none" stroke="#222" strokeWidth="3" />
+          <circle
+            cx="22" cy="22" r={R} fill="none"
+            stroke={urgent ? '#FF6B35' : '#00FF7F'}
+            strokeWidth="3"
+            strokeDasharray={circ}
+            strokeDashoffset={circ * (1 - pct)}
+            strokeLinecap="round"
+            transform="rotate(-90 22 22)"
+            style={{ transition: 'stroke-dashoffset 1s linear' }}
+          />
+        </svg>
+        <span
+          className="absolute inset-0 flex items-center justify-center text-[13px] font-bold"
+          style={{ color: urgent ? '#FF6B35' : '#00FF7F' }}
+        >
+          {seconds}
+        </span>
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-bold text-white">Descanso</p>
+        <p className="text-xs text-ios-text-secondary">{urgent ? 'Prepare-se!' : 'Próxima série em breve'}</p>
+      </div>
+      <button
+        onClick={onSkip}
+        className="px-3 py-1.5 rounded-lg text-xs font-bold text-ios-text-secondary"
+        style={{ background: '#222', border: '1px solid #333' }}
+        aria-label="Pular descanso"
+      >
+        Pular
+      </button>
+    </div>
   );
 }
 
-function ExercicioRow({ prescricao, numero }) {
+/* ─── CompletionModal ────────────────────────────────── */
+function CompletionModal({ onCheckin, onClose, totalSets, treinoNome }) {
+  const COLORS = ['#00FF7F', '#FFD700', '#FF6B35', '#00BFFF', '#FF453A'];
+
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-ios-border last:border-0">
-      <div className="w-8 h-8 bg-card2 rounded-xl flex items-center justify-center font-black text-ios-text-secondary text-sm shrink-0 mt-0.5">
-        {numero}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-white leading-tight truncate">
-          {prescricao.nome_exercicio || `Exercício ${prescricao.exercicio_id}`}
-        </p>
-        <div className="flex flex-wrap gap-1.5 mt-1.5">
-          <span className="text-xs font-bold text-white/60 bg-card2 px-2 py-0.5 rounded-md">
-            {prescricao.series}x{prescricao.repeticoes}
-          </span>
-          {prescricao.carga && (
-            <span className="text-xs font-bold text-white/60 bg-card2 px-2 py-0.5 rounded-md">
-              {prescricao.carga}
-            </span>
-          )}
-          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-            {prescricao.descanso}s descanso
-          </span>
+    <div
+      className="absolute inset-0 flex items-center justify-center px-6"
+      style={{ background: 'rgba(0,0,0,0.88)', zIndex: 200, animation: 'fadeIn 0.2s ease' }}
+    >
+      {Array.from({ length: 14 }, (_, i) => (
+        <div
+          key={i}
+          className="absolute pointer-events-none"
+          style={{
+            left: `${10 + (i / 14) * 80}%`,
+            top: `${20 + (i % 3) * 15}%`,
+            width: i % 2 === 0 ? 8 : 5,
+            height: i % 2 === 0 ? 8 : 5,
+            background: COLORS[i % COLORS.length],
+            borderRadius: i % 3 === 0 ? '50%' : 2,
+            animation: `confetti ${0.6 + (i % 3) * 0.2}s ease-out ${i * 0.05}s forwards`,
+          }}
+        />
+      ))}
+      <div
+        className="bg-card rounded-3xl p-7 w-full max-w-xs text-center"
+        style={{ border: '1px solid rgba(255,255,255,0.1)', animation: 'pop 0.35s cubic-bezier(0.16,1,0.3,1)' }}
+      >
+        <div className="text-5xl mb-3">🎉</div>
+        <h2 className="text-2xl font-black text-white mb-1">Treino Concluído!</h2>
+        <p className="text-sm text-ios-text-secondary mb-5">Excelente performance!</p>
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          <div className="bg-card2 rounded-2xl p-3">
+            <p className="text-lg font-black text-primary">{totalSets}</p>
+            <p className="text-[11px] text-ios-text-secondary mt-0.5">Séries</p>
+          </div>
+          <div className="bg-card2 rounded-2xl p-3">
+            <p className="text-sm font-black text-primary truncate">{treinoNome}</p>
+            <p className="text-[11px] text-ios-text-secondary mt-0.5">Treino</p>
+          </div>
         </div>
+        <button
+          onClick={onCheckin}
+          className="w-full py-3.5 bg-primary text-black font-black rounded-2xl text-sm mb-2"
+        >
+          Fazer Check-in ✓
+        </button>
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 font-bold text-sm rounded-2xl"
+          style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#888' }}
+        >
+          Fechar
+        </button>
       </div>
     </div>
   );
 }
 
-function TreinoCard({ treino, defaultOpen }) {
-  const [aberto, setAberto] = useState(defaultOpen);
+/* ─── ExercicioAccordion ─────────────────────────────── */
+function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, onOpen }) {
+  const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
+  const doneCnt = sets.filter(n => doneSets[`p${prescricao.id}_s${n}`]).length;
+  const allDone = doneCnt === sets.length && sets.length > 0;
 
   return (
-    <div className="bg-card rounded-2xl border border-ios-border overflow-hidden mb-3">
+    <div className="mb-2">
       <button
-        onClick={() => setAberto(a => !a)}
-        className="w-full flex items-center justify-between p-5 active:bg-card2 transition-colors"
+        onClick={onOpen}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
+        style={{
+          background: allDone ? 'rgba(0,255,127,0.08)' : isOpen ? 'rgba(255,255,255,0.04)' : '#1A1A1A',
+          borderRadius: isOpen ? '14px 14px 0 0' : 14,
+          border: `1px solid ${allDone ? 'rgba(0,255,127,0.25)' : isOpen ? 'rgba(255,255,255,0.1)' : '#2A2A2A'}`,
+          borderBottom: isOpen ? '1px solid rgba(255,255,255,0.05)' : undefined,
+          transition: 'background 0.15s',
+        }}
+        aria-expanded={isOpen}
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-            <span className="text-sm font-black text-primary">{treino.nome.charAt(0)}</span>
-          </div>
-          <div className="text-left">
-            <p className="font-black text-white">{treino.nome}</p>
-            <p className="text-xs text-ios-text-secondary font-medium">
-              {treino.prescricoes?.length ?? 0} exercícios
-            </p>
-          </div>
-        </div>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2.5}
-          stroke="currentColor"
-          className={`w-4 h-4 text-ios-text-secondary transition-transform duration-200 ${aberto ? 'rotate-90' : ''}`}
+        <div
+          className="w-9 h-9 flex items-center justify-center text-[13px] font-bold shrink-0"
+          style={{
+            borderRadius: 10,
+            background: allDone ? 'rgba(0,255,127,0.1)' : '#222',
+            border: `1px solid ${allDone ? 'rgba(0,255,127,0.3)' : '#333'}`,
+            color: allDone ? '#00FF7F' : '#888',
+            animation: allDone ? 'checkBounce 0.4s ease' : 'none',
+          }}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-        </svg>
+          {allDone ? (
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2.5 7l3 3L11.5 4" stroke="#00FF7F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          ) : numero}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-bold text-white truncate">
+            {prescricao.nome_exercicio ?? `Exercício ${prescricao.exercicio_id}`}
+          </p>
+          <p className="text-xs text-ios-text-secondary mt-0.5">
+            {prescricao.series}×{prescricao.repeticoes}
+            {prescricao.carga ? ` · ${prescricao.carga}` : ''}
+            {prescricao.descanso ? ` · ${prescricao.descanso}s` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold" style={{ color: allDone ? '#00FF7F' : '#888' }}>
+            {doneCnt}/{sets.length}
+          </span>
+          <svg
+            width="14" height="14" viewBox="0 0 14 14" fill="none"
+            style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+          >
+            <path d="M3 5l4 4 4-4" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
       </button>
 
-      {aberto && (
-        <div className="px-5 pb-3 border-t border-ios-border">
-          {treino.prescricoes?.map((p, idx) => (
-            <ExercicioRow key={p.id} prescricao={p} numero={idx + 1} />
-          ))}
-          {(!treino.prescricoes || treino.prescricoes.length === 0) && (
-            <p className="text-ios-text-secondary text-sm py-4 text-center">Nenhum exercício cadastrado.</p>
-          )}
+      {isOpen && (
+        <div style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none', borderRadius: '0 0 14px 14px' }}>
+          {/* Cabeçalho */}
+          <div
+            className="grid px-4 py-2"
+            style={{ gridTemplateColumns: '28px 1fr 1fr 48px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+          >
+            {['#', 'Reps', 'Carga', '✓'].map((h, i) => (
+              <span
+                key={i}
+                className="text-[11px] font-bold uppercase"
+                style={{ color: '#555', letterSpacing: '0.05em', textAlign: i === 0 ? 'left' : 'center' }}
+              >
+                {h}
+              </span>
+            ))}
+          </div>
+          {/* Linhas de série */}
+          {sets.map(n => {
+            const key  = `p${prescricao.id}_s${n}`;
+            const done = !!doneSets[key];
+            return (
+              <div
+                key={n}
+                className="grid px-4 py-3 items-center"
+                style={{
+                  gridTemplateColumns: '28px 1fr 1fr 48px',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  background: done ? 'rgba(0,255,127,0.04)' : 'transparent',
+                  transition: 'background 0.2s',
+                }}
+              >
+                <span className="text-[13px] font-bold" style={{ color: done ? '#00FF7F' : '#888' }}>{n}</span>
+                <span className="text-[15px] font-bold text-center" style={{ color: done ? '#00FF7F' : '#fff' }}>
+                  {prescricao.repeticoes || '—'}
+                </span>
+                <span className="text-[13px] font-medium text-center text-ios-text-secondary">
+                  {prescricao.carga || '—'}
+                </span>
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => onToggle(prescricao.id, n, prescricao.descanso)}
+                    aria-pressed={done}
+                    className="w-11 h-11 flex items-center justify-center"
+                    style={{
+                      borderRadius: 10,
+                      background: done ? '#00FF7F' : '#222',
+                      border: `1.5px solid ${done ? '#00FF7F' : '#555'}`,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {done && (
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M2.5 7l3 3L11.5 4" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
+/* ─── Main ───────────────────────────────────────────── */
 export default function Treinos() {
+  const navigate                       = useNavigate();
   const { planoAtivo, loading, error } = useAluno();
+
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [openPrescId, setOpenPrescId] = useState(null);
+  const [doneSets, setDoneSets]       = useState({});
+  const [restSecs, setRestSecs]       = useState(null);
+  const [restTotal, setRestTotal]     = useState(60);
+  const [showModal, setShowModal]     = useState(false);
+  const timerRef                      = useRef(null);
+
+  const selectedTreino = planoAtivo?.treinos?.[selectedIdx] ?? null;
+
+  const totalSets = useMemo(
+    () => selectedTreino?.prescricoes?.reduce((s, p) => s + (p.series || 0), 0) ?? 0,
+    [selectedTreino],
+  );
+
+  const doneCnt      = Object.values(doneSets).filter(Boolean).length;
+  const pct          = totalSets > 0 ? Math.round((doneCnt / totalSets) * 100) : 0;
+  const milestoneMsg = pct >= 75 ? '💪 Quase lá!' : pct >= 50 ? '⚡ Metade, ótimo ritmo!' : pct >= 25 ? '🔥 Aquecido!' : null;
+
+  useEffect(() => {
+    setOpenPrescId(selectedTreino?.prescricoes?.[0]?.id ?? null);
+    setDoneSets({});
+    setRestSecs(null);
+    clearTimeout(timerRef.current);
+  }, [selectedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (restSecs === null || restSecs <= 0) {
+      if (restSecs === 0) setRestSecs(null);
+      return;
+    }
+    timerRef.current = setTimeout(() => setRestSecs(s => s - 1), 1000);
+    return () => clearTimeout(timerRef.current);
+  }, [restSecs]);
+
+  function toggleSet(prescId, setNum, descanso) {
+    const key = `p${prescId}_s${setNum}`;
+    setDoneSets(prev => {
+      const nowDone  = !prev[key];
+      const next     = { ...prev, [key]: nowDone };
+      const newCount = Object.values(next).filter(Boolean).length;
+
+      if (nowDone) {
+        clearTimeout(timerRef.current);
+        if (newCount === totalSets) {
+          setRestSecs(null);
+          setTimeout(() => setShowModal(true), 300);
+        } else {
+          const secs = descanso || 60;
+          setRestTotal(secs);
+          setRestSecs(secs);
+        }
+      }
+      return next;
+    });
+  }
 
   if (loading) {
     return (
@@ -98,60 +313,132 @@ export default function Treinos() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-ios-background px-6">
-        <p className="text-ios-red text-center font-bold">{error}</p>
+        <p className="text-danger text-center font-bold">{error}</p>
       </div>
     );
   }
 
+  if (!planoAtivo || !planoAtivo.treinos?.length) {
+    return (
+      <div className="min-h-screen bg-ios-background px-4 pt-14 pb-6">
+        <h1 className="text-3xl font-black text-white tracking-tight mb-6">Meus Treinos</h1>
+        <div className="bg-card rounded-2xl border border-ios-border p-8 text-center">
+          <p className="text-ios-text-secondary">Nenhum plano ativo. Fale com seu personal trainer.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const treinos = planoAtivo.treinos;
+
   return (
-    <div className="min-h-screen bg-ios-background px-4 pt-14 pb-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-black text-white tracking-tight">Meus Treinos</h1>
-        {planoAtivo && (
-          <p className="text-ios-text-secondary text-sm font-bold uppercase tracking-widest mt-1">
-            {planoAtivo.titulo}
-          </p>
+    <div className="min-h-screen bg-ios-background pb-4 relative" style={{ animation: 'fadeIn 0.25s ease' }}>
+
+      {showModal && (
+        <CompletionModal
+          totalSets={totalSets}
+          treinoNome={selectedTreino?.nome ?? 'Treino'}
+          onCheckin={() => { setShowModal(false); navigate('/checkin'); }}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {/* Header */}
+      <div className="px-5 pt-5 pb-0" style={{ background: 'linear-gradient(180deg, rgba(0,255,127,0.05) 0%, transparent 100%)' }}>
+        {/* Tabs de treinos */}
+        {treinos.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>
+            {treinos.map((t, i) => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedIdx(i)}
+                className="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold"
+                style={{
+                  background: selectedIdx === i ? '#00FF7F' : 'rgba(255,255,255,0.06)',
+                  color: selectedIdx === i ? '#000' : '#888',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {t.nome || `Treino ${String.fromCharCode(65 + i)}`}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <h1 className="text-[26px] font-black text-white mt-1 mb-0.5" style={{ letterSpacing: '-0.02em' }}>
+          {selectedTreino?.nome ?? 'Treino'}
+        </h1>
+        <p className="text-[13px] text-ios-text-secondary mb-3">
+          {selectedTreino?.prescricoes?.length ?? 0} exercícios · {totalSets} séries
+        </p>
+
+        {/* Progresso */}
+        <div className="flex justify-between mb-2">
+          <span className="text-[13px] font-medium text-ios-text-secondary">
+            {milestoneMsg || `${doneCnt} / ${totalSets} séries`}
+          </span>
+          <span className="text-sm font-black" style={{ color: pct > 0 ? '#00FF7F' : '#555' }}>
+            {pct}%
+          </span>
+        </div>
+        <div
+          className="h-2 rounded-full overflow-hidden mb-3"
+          style={{ background: '#222' }}
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Progresso do treino"
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              background: '#00FF7F',
+              transform: `scaleX(${pct / 100})`,
+              transformOrigin: 'left',
+              transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
+            }}
+          />
+        </div>
+
+        {restSecs !== null && (
+          <RestTimer
+            seconds={restSecs}
+            total={restTotal}
+            onSkip={() => { clearTimeout(timerRef.current); setRestSecs(null); }}
+          />
         )}
       </div>
 
-      {!planoAtivo ? (
-        <div className="bg-card rounded-2xl border border-ios-border p-8 text-center">
-          <p className="text-ios-text-secondary font-medium">Nenhum plano ativo no momento.</p>
-          <p className="text-xs text-ios-text-secondary mt-1">Fale com seu personal trainer.</p>
-        </div>
-      ) : (
-        <>
-          {/* Info do plano */}
-          <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 mb-5">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-[10px] font-black text-primary uppercase tracking-widest">Plano atual</p>
-                <p className="font-black text-white mt-0.5">{planoAtivo.titulo}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-black text-ios-text-secondary uppercase tracking-widest">Duração</p>
-                <p className="font-black text-white">{planoAtivo.duracao_semanas} sem.</p>
-              </div>
-            </div>
-            {planoAtivo.objetivo_estrategico && (
-              <p className="text-xs text-ios-text-secondary mt-2 border-t border-primary/20 pt-2">
-                {planoAtivo.objetivo_estrategico}
-              </p>
-            )}
-          </div>
+      {/* Lista de exercícios */}
+      <div className="px-4 mt-2 pb-4">
+        {selectedTreino?.prescricoes?.map((p, idx) => (
+          <ExercicioAccordion
+            key={p.id}
+            prescricao={p}
+            numero={idx + 1}
+            doneSets={doneSets}
+            onToggle={toggleSet}
+            isOpen={openPrescId === p.id}
+            onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
+          />
+        ))}
 
-          {/* Lista de treinos */}
-          {planoAtivo.treinos?.length > 0 ? (
-            planoAtivo.treinos.map((treino, idx) => (
-              <TreinoCard key={treino.id} treino={treino} defaultOpen={idx === 0} />
-            ))
-          ) : (
-            <div className="bg-card rounded-2xl border border-ios-border p-8 text-center">
-              <p className="text-ios-text-secondary font-medium">Nenhum treino no plano ainda.</p>
-            </div>
-          )}
-        </>
-      )}
+        {pct > 0 && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="w-full py-4 mt-2 rounded-2xl text-[15px] font-bold"
+            style={{
+              background: pct === 100 ? '#00FF7F' : '#1A1A1A',
+              border: `1px solid ${pct === 100 ? '#00FF7F' : '#2A2A2A'}`,
+              color: pct === 100 ? '#000' : '#888',
+              transition: 'all 0.2s',
+            }}
+          >
+            {pct === 100 ? '🎉 Ver Resumo do Treino' : `Finalizar com ${pct}% concluído`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
