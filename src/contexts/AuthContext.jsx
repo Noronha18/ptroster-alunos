@@ -17,16 +17,6 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const identificarAluno = async (sub) => {
-    try {
-      const { data } = await api.get('/alunos/');
-      const lista = Array.isArray(data) ? data : [data];
-      return lista.find(a => a.usuario?.username === sub || a.cpf === sub) || null;
-    } catch (error) {
-      return null;
-    }
-  };
-
   const login = async (username, password) => {
     try {
       const { data } = await api.post(
@@ -39,16 +29,15 @@ export function AuthProvider({ children }) {
       setToken(access_token);
 
       const decoded = decodeToken(access_token);
-      const sub = decoded?.sub || username;
+      const alunoId = decoded?.aluno_id;
 
-      const aluno = await identificarAluno(sub);
-      if (!aluno) {
+      if (!alunoId) {
         clearAuth();
-        return { success: false, message: 'Aluno não encontrado. Verifique seu usuário ou CPF.' };
+        return { success: false, message: 'Usuário não vinculado a um aluno. Contate seu personal trainer.' };
       }
 
-      setAlunoId(aluno.id);
-      setUser({ authenticated: true, alunoId: aluno.id });
+      setAlunoId(alunoId);
+      setUser({ authenticated: true, alunoId });
       return { success: true };
     } catch (error) {
       clearAuth();
