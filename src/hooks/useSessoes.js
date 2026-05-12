@@ -45,13 +45,14 @@ export function useSessoes() {
     }
   }, []);
 
-  const fazerCheckin = useCallback(async (planoTreinoId = null) => {
+  const fazerCheckin = useCallback(async ({ planoTreinoId = null, tipoAtividade = null } = {}) => {
     const alunoId = getAlunoId();
     setCheckingIn(true);
     try {
       const { data } = await api.post('/sessoes/', {
         aluno_id: alunoId,
         plano_treino_id: planoTreinoId,
+        tipo_atividade: tipoAtividade,
         realizada: true,
       });
       setSessaoHoje(data);

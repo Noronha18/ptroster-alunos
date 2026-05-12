@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSessoes } from '../hooks/useSessoes';
+import { useAluno } from '../hooks/useAluno';
 
 const getDiaSemana = (dataHora) => {
   const dias = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -78,8 +79,26 @@ function WeeklyBars({ data }) {
   );
 }
 
+const ICONES_ATIVIDADE = { Corrida: '🏃', Cardio: '🔥', Natação: '🏊', Funcional: '⚡' };
+
+const labelSessao = (sessao, planos) => {
+  if (sessao.tipo_atividade) return sessao.tipo_atividade;
+  if (sessao.plano_treino_id) {
+    const plano = planos?.find(p => p.id === sessao.plano_treino_id);
+    if (plano) return plano.titulo;
+  }
+  return 'Sessão Presencial';
+};
+
+const iconesSessao = (sessao, index) => {
+  if (index === 0) return '⚡';
+  if (sessao.tipo_atividade) return ICONES_ATIVIDADE[sessao.tipo_atividade] ?? '🏋️';
+  return '✓';
+};
+
 export default function Historico() {
   const { historico, loadingHistorico, buscarHistorico } = useSessoes();
+  const { aluno } = useAluno();
 
   useEffect(() => { buscarHistorico(); }, [buscarHistorico]);
 
@@ -172,11 +191,11 @@ export default function Historico() {
                   className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base"
                   style={{ background: i === 0 ? 'rgba(0,255,127,0.1)' : '#222' }}
                 >
-                  {i === 0 ? '⚡' : '✓'}
+                  {iconesSessao(sessao, i)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[14px] font-bold text-white truncate">
-                    {sessao.plano_treino?.titulo ?? 'Sessão Presencial'}
+                    {labelSessao(sessao, aluno?.planos_treino)}
                   </p>
                   <p className="text-xs text-ios-text-secondary mt-0.5">
                     {getDiaSemana(sessao.data_hora)} · {formatarData(sessao.data_hora)}
