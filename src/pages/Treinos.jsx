@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
+import api from '../services/api';
 
 /* ─── RestTimer ─────────────────────────────────────── */
 function RestTimer({ seconds, total, onSkip }) {
@@ -115,10 +116,32 @@ function CompletionModal({ onCheckin, onClose, totalSets, treinoNome }) {
 }
 
 /* ─── ExercicioAccordion ─────────────────────────────── */
-function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, onOpen }) {
+function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, onOpen, onCargaUpdate }) {
   const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
   const doneCnt = sets.filter(n => doneSets[`p${prescricao.id}_s${n}`]).length;
   const allDone = doneCnt === sets.length && sets.length > 0;
+
+  const cargaInicial = prescricao.carga_kg || prescricao.carga || '';
+  const [cargaInput, setCargaInput] = useState(cargaInicial);
+  const [salvando, setSalvando]     = useState(false);
+  const [salvo, setSalvo]           = useState(false);
+  const cargaSalvaRef               = useRef(cargaInicial);
+
+  async function handleSalvarCarga() {
+    if (cargaInput === cargaSalvaRef.current) return;
+    setSalvando(true);
+    try {
+      await api.patch(`/prescricoes/${prescricao.id}/carga`, { carga: cargaInput || null });
+      cargaSalvaRef.current = cargaInput;
+      onCargaUpdate(prescricao.id, cargaInput);
+      setSalvo(true);
+      setTimeout(() => setSalvo(false), 2000);
+    } catch {
+      setCargaInput(cargaSalvaRef.current);
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   return (
     <div className="mb-2">
@@ -156,8 +179,10 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
           </p>
           <p className="text-xs text-ios-text-secondary mt-0.5">
             {prescricao.series}×{prescricao.repeticoes}
-            {prescricao.carga ? ` · ${prescricao.carga}` : ''}
-            {prescricao.descanso ? ` · ${prescricao.descanso}s` : ''}
+            {cargaInput ? ` · ${cargaInput}` : ''}
+            {(prescricao.tempo_descanso_segundos ?? prescricao.descanso)
+              ? ` · ${prescricao.tempo_descanso_segundos ?? prescricao.descanso}s`
+              : ''}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -175,7 +200,38 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
 
       {isOpen && (
         <div style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none', borderRadius: '0 0 14px 14px' }}>
-          {/* Cabeçalho */}
+          {/* Input de carga */}
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <p className="text-[11px] font-bold uppercase mb-1.5" style={{ color: '#555', letterSpacing: '0.05em' }}>
+              Minha Carga
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={cargaInput}
+                onChange={e => setCargaInput(e.target.value)}
+                onBlur={handleSalvarCarga}
+                onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                placeholder="Ex: 60kg"
+                className="flex-1 px-3 py-2 text-sm font-bold rounded-xl"
+                style={{
+                  background: '#222',
+                  border: '1.5px solid #333',
+                  color: '#fff',
+                  outline: 'none',
+                }}
+              />
+              {salvando && (
+                <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#00FF7F', borderTopColor: 'transparent' }} />
+              )}
+              {salvo && !salvando && (
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M3 9l4 4L15 5" stroke="#00FF7F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+          </div>
+          {/* Cabeçalho das séries */}
           <div
             className="grid px-4 py-2"
             style={{ gridTemplateColumns: '28px 1fr 1fr 48px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
@@ -210,7 +266,7 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
                   {prescricao.repeticoes || '—'}
                 </span>
                 <span className="text-[13px] font-medium text-center text-ios-text-secondary">
-                  {prescricao.carga_kg || prescricao.carga || '—'}
+                  {cargaInput || '—'}
                 </span>
                 <div className="flex justify-center">
                   <button
@@ -259,13 +315,18 @@ export default function Treinos() {
   const navigate                       = useNavigate();
   const { planoAtivo, loading, error } = useAluno();
 
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const [openPrescId, setOpenPrescId] = useState(null);
-  const [doneSets, setDoneSets]       = useState({});
-  const [restSecs, setRestSecs]       = useState(null);
-  const [restTotal, setRestTotal]     = useState(60);
-  const [showModal, setShowModal]     = useState(false);
-  const timerRef                      = useRef(null);
+  const [selectedIdx, setSelectedIdx]     = useState(0);
+  const [openPrescId, setOpenPrescId]     = useState(null);
+  const [doneSets, setDoneSets]           = useState({});
+  const [restSecs, setRestSecs]           = useState(null);
+  const [restTotal, setRestTotal]         = useState(60);
+  const [showModal, setShowModal]         = useState(false);
+  const [cargaOverrides, setCargaOverrides] = useState({});
+  const timerRef                          = useRef(null);
+
+  function handleCargaUpdate(prescricaoId, novaCarga) {
+    setCargaOverrides(prev => ({ ...prev, [prescricaoId]: novaCarga }));
+  }
 
   const selectedTreino = planoAtivo?.treinos?.[selectedIdx] ?? null;
 
@@ -435,6 +496,7 @@ export default function Treinos() {
             onToggle={toggleSet}
             isOpen={openPrescId === p.id}
             onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
+            onCargaUpdate={handleCargaUpdate}
           />
         ))}
 
