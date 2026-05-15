@@ -210,11 +210,11 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
                   {prescricao.repeticoes || '—'}
                 </span>
                 <span className="text-[13px] font-medium text-center text-ios-text-secondary">
-                  {prescricao.carga || '—'}
+                  {prescricao.carga_kg || prescricao.carga || '—'}
                 </span>
                 <div className="flex justify-center">
                   <button
-                    onClick={() => onToggle(prescricao.id, n, prescricao.descanso)}
+                    onClick={() => onToggle(prescricao.id, n, prescricao.tempo_descanso_segundos ?? prescricao.descanso ?? 60)}
                     aria-pressed={done}
                     className="w-11 h-11 flex items-center justify-center"
                     style={{
@@ -234,6 +234,20 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
               </div>
             );
           })}
+          {/* Observações do personal */}
+          {prescricao.observacoes && (
+            <div
+              className="px-4 py-3"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+            >
+              <p className="text-[11px] font-bold uppercase" style={{ color: '#555', letterSpacing: '0.05em', marginBottom: 4 }}>
+                Nota do Personal
+              </p>
+              <p className="text-[13px]" style={{ color: '#aaa', lineHeight: 1.5 }}>
+                {prescricao.observacoes}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
