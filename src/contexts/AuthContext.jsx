@@ -4,15 +4,39 @@ import { getToken, setToken, clearAuth, getAlunoId, setAlunoId, decodeToken } fr
 
 const AuthContext = createContext({});
 
+const ALUNO_CACHE_KEY = 'ptroster_aluno_cache';
+
+function getCachedAluno() {
+  try {
+    const raw = localStorage.getItem(ALUNO_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedAluno(data) {
+  try {
+    localStorage.setItem(ALUNO_CACHE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function clearCachedAluno() {
+  localStorage.removeItem(ALUNO_CACHE_KEY);
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [aluno, setAluno] = useState(null);
+  const [aluno, setAluno] = useState(getCachedAluno);
   const [alunoLoading, setAlunoLoading] = useState(false);
   const [alunoError, setAlunoError] = useState(null);
 
   const loadAluno = useCallback(async (alunoId) => {
-    setAlunoLoading(true);
+    // Sem cache: mostra spinner. Com cache: atualiza silenciosamente em background.
+    const cached = getCachedAluno();
+    if (!cached) setAlunoLoading(true);
+
     try {
       let data;
       try {
@@ -22,12 +46,14 @@ export function AuthProvider({ children }) {
       }
       setAluno(data);
       setAlunoError(null);
+      setCachedAluno(data);
     } catch {
       const decoded = decodeToken(getToken());
       if (decoded?.nome) {
-        setAluno({ nome: decoded.nome, id: alunoId });
+        const fallback = { nome: decoded.nome, id: alunoId };
+        setAluno(prev => prev ?? fallback);
         setAlunoError(null);
-      } else {
+      } else if (!cached) {
         setAlunoError('Não foi possível carregar seus dados.');
       }
     } finally {
@@ -80,6 +106,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     clearAuth();
+    clearCachedAluno();
     setUser(null);
     setAluno(null);
     setAlunoError(null);

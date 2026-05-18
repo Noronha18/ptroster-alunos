@@ -17,7 +17,6 @@ api.interceptors.response.use(
     // Não redirecionar se for erro 401 na rota de login ou se já estivermos na página de login
     const isLoginRoute = error.config?.url?.includes('/auth/token');
     if (error.response?.status === 401 && !isLoginRoute && window.location.pathname !== '/login') {
-      console.log('Sessão expirada ou não autorizado, redirecionando...');
       clearAuth();
       window.location.href = '/login';
     }

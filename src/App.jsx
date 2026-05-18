@@ -1,12 +1,14 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { BottomNav } from './components/BottomNav';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Treinos from './pages/Treinos';
-import Checkin from './pages/Checkin';
-import Historico from './pages/Historico';
-import Perfil from './pages/Perfil';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Treinos   = lazy(() => import('./pages/Treinos'));
+const Checkin   = lazy(() => import('./pages/Checkin'));
+const Historico = lazy(() => import('./pages/Historico'));
+const Perfil    = lazy(() => import('./pages/Perfil'));
 
 function ProtectedLayout({ children }) {
   const { user, loading } = useAuth();
@@ -23,7 +25,13 @@ function ProtectedLayout({ children }) {
 
   return (
     <div className="pb-20">
-      {children}
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-screen bg-ios-background">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      }>
+        {children}
+      </Suspense>
       <BottomNav />
     </div>
   );
