@@ -115,6 +115,39 @@ function CompletionModal({ onCheckin, onClose, totalSets, treinoNome }) {
   );
 }
 
+/* ─── VideoExercicio ─────────────────────────────────── */
+function getYouTubeId(url) {
+  const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
+function VideoExercicio({ url }) {
+  const ytId = getYouTubeId(url);
+
+  if (ytId) {
+    return (
+      <div style={{ position: 'relative', paddingBottom: '56.25%', borderRadius: 10, overflow: 'hidden' }}>
+        <iframe
+          src={`https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1`}
+          title="Execução do exercício"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <video
+      src={url}
+      controls
+      playsInline
+      style={{ width: '100%', borderRadius: 10, maxHeight: 220, background: '#000' }}
+    />
+  );
+}
+
 /* ─── ExercicioAccordion ─────────────────────────────── */
 function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, onOpen, onCargaUpdate }) {
   const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
@@ -200,6 +233,15 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
 
       {isOpen && (
         <div style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none', borderRadius: '0 0 14px 14px' }}>
+          {/* Vídeo de execução */}
+          {prescricao.exercicio?.video_url && (
+            <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[11px] font-bold uppercase mb-2" style={{ color: '#555', letterSpacing: '0.05em' }}>
+                Execução
+              </p>
+              <VideoExercicio url={prescricao.exercicio.video_url} />
+            </div>
+          )}
           {/* Input de carga */}
           <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
             <p className="text-[11px] font-bold uppercase mb-1.5" style={{ color: '#555', letterSpacing: '0.05em' }}>
