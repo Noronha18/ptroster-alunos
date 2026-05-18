@@ -33,7 +33,7 @@ export function useSessoes() {
     setLoadingHistorico(true);
     try {
       const { data } = await api.get('/sessoes/', {
-        params: { aluno_id: alunoId, realizada: true, limit: 100 },
+        params: { aluno_id: alunoId, realizada: true, limit: 30 },
       });
       // Ordenar por data decrescente (mais recentes primeiro)
       const ordenado = [...data].sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
