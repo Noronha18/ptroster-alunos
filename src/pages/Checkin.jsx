@@ -88,7 +88,6 @@ export default function Checkin() {
     return (
       <div
         className="min-h-screen bg-ios-background flex flex-col items-center justify-center px-7 text-center"
-        style={{ animation: 'fadeIn 0.25s ease' }}
       >
         <div style={{ animation: 'pop 0.4s cubic-bezier(0.16,1,0.3,1)' }}>
           <div
@@ -122,7 +121,7 @@ export default function Checkin() {
   }
 
   return (
-    <div className="min-h-screen bg-ios-background px-5 pt-6 pb-6 flex flex-col" style={{ animation: 'fadeIn 0.25s ease' }}>
+    <div className="min-h-screen bg-ios-background px-5 pt-6 pb-6 flex flex-col">
       <div className="mb-5">
         <h1 className="text-[28px] font-black text-white mb-1" style={{ letterSpacing: '-0.02em' }}>Check-in</h1>
         <p className="text-[14px] text-ios-text-secondary">{formatarDataCompleta()}</p>
@@ -151,7 +150,8 @@ export default function Checkin() {
         ))}
       </div>
 
-      {/* Conteúdo do modo selecionado */}
+      {/* Conteúdo do modo selecionado — key reinicia o fade ao alternar */}
+      <div key={modo} className="flex-1" style={{ animation: 'fadeIn 0.2s ease' }}>
       {modo === 'plano' ? (
         <div className="flex-1">
           {planos.length === 0 ? (
@@ -242,7 +242,7 @@ export default function Checkin() {
               value={outraAtividade}
               onChange={e => setOutraAtividade(e.target.value)}
               maxLength={60}
-              className="w-full rounded-2xl px-4 py-3.5 text-white text-[14px] font-medium outline-none"
+              className="input-dark w-full rounded-2xl px-4 py-3.5 text-white text-[14px] font-medium outline-none"
               style={{
                 background: '#1A1A1A',
                 border: '1px solid rgba(0,255,127,0.3)',
@@ -251,6 +251,7 @@ export default function Checkin() {
           )}
         </div>
       )}
+      </div>
 
       {/* Botão CTA */}
       <div className="pt-5">

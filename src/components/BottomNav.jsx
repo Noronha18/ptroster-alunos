@@ -52,7 +52,12 @@ export function BottomNav() {
     <nav
       className="fixed bottom-0 left-0 right-0 z-40"
       aria-label="Navegação principal"
-      style={{ background: 'rgba(13,13,13,0.97)', backdropFilter: 'blur(24px)', borderTop: '1px solid rgba(255,255,255,0.07)' }}
+      style={{
+        background: 'rgba(13,13,13,0.97)',
+        backdropFilter: 'blur(24px)',
+        borderTop: '1px solid rgba(255,255,255,0.07)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
     >
       <div className="flex items-stretch max-w-lg mx-auto" style={{ height: 64 }}>
         {navItems.map(({ to, label, Icon }) => (
@@ -72,7 +77,7 @@ export function BottomNav() {
                 {isActive && (
                   <div
                     className="absolute top-0 left-1/2 -translate-x-1/2 rounded-b"
-                    style={{ width: 28, height: 2.5, background: '#00FF7F' }}
+                    style={{ width: 28, height: 2.5, background: '#00FF7F', animation: 'navIndicator 0.3s var(--ease-out-quint)' }}
                   />
                 )}
                 <Icon active={isActive} />

@@ -62,6 +62,8 @@ function WeeklyBars({ data }) {
                   height: Math.max(barH, d.count > 0 ? 4 : 2),
                   background: isLast ? '#00FF7F' : 'rgba(0,255,127,0.28)',
                   minHeight: 2,
+                  transformOrigin: 'bottom',
+                  animation: `barGrow 0.5s var(--ease-out-quint) ${i * 40}ms backwards`,
                 }}
               />
             </div>
@@ -115,7 +117,7 @@ export default function Historico() {
   const thisMes    = getThisMonth(historico);
 
   return (
-    <div className="min-h-screen bg-ios-background pb-6" style={{ animation: 'fadeIn 0.25s ease' }}>
+    <div className="min-h-screen bg-ios-background pb-6">
       <div className="px-5 pt-6 mb-4">
         <h1 className="text-[28px] font-black text-white mb-1" style={{ letterSpacing: '-0.02em' }}>Histórico</h1>
         <p className="text-[14px] text-ios-text-secondary">Últimas 8 semanas</p>
@@ -185,6 +187,7 @@ export default function Historico() {
                 style={{
                   background: i === 0 ? 'rgba(0,255,127,0.06)' : '#1A1A1A',
                   border: `1px solid ${i === 0 ? 'rgba(0,255,127,0.18)' : 'rgba(255,255,255,0.07)'}`,
+                  animation: `slideUp 0.35s var(--ease-out-quint) ${Math.min(i * 35, 280)}ms backwards`,
                 }}
               >
                 <div

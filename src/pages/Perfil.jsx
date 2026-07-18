@@ -87,7 +87,7 @@ export default function Perfil() {
   const metaMes = (aluno?.frequencia_semanal_plano ?? 0) * 4;
 
   return (
-    <div className="min-h-screen bg-ios-background pb-6" style={{ animation: 'fadeIn 0.25s ease' }}>
+    <div className="min-h-screen bg-ios-background pb-6">
 
       {/* Cabeçalho do perfil */}
       <div

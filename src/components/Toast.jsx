@@ -28,7 +28,7 @@ export function Toast({ toast }) {
   return (
     <div
       className={`fixed bottom-24 left-4 right-4 z-50 ${styles[toast.type]} text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3`}
-      style={{ animation: 'slideUp 0.3s ease-out' }}
+      style={{ animation: 'slideUp 0.3s var(--ease-out-quint), fadeOutDown 0.25s ease-in 3.2s forwards' }}
     >
       {icons[toast.type]}
       <p className="font-bold text-sm leading-snug">{toast.message}</p>

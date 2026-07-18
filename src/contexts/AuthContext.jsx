@@ -32,6 +32,16 @@ export function AuthProvider({ children }) {
   const [alunoLoading, setAlunoLoading] = useState(false);
   const [alunoError, setAlunoError] = useState(null);
 
+  // Atualiza o aluno em memória E no cache do localStorage — sem isso,
+  // mudanças feitas pelo aluno (ex: carga) voltam ao valor antigo ao reabrir o app.
+  const updateAluno = useCallback((updater) => {
+    setAluno(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (next) setCachedAluno(next);
+      return next;
+    });
+  }, []);
+
   const loadAluno = useCallback(async (alunoId) => {
     // Sem cache: mostra spinner. Com cache: atualiza silenciosamente em background.
     const cached = getCachedAluno();
@@ -113,7 +123,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, aluno, setAluno, alunoLoading, alunoError }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, aluno, setAluno, updateAluno, alunoLoading, alunoError }}>
       {children}
     </AuthContext.Provider>
   );

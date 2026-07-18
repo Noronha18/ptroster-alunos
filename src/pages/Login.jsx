@@ -96,6 +96,7 @@ export default function Login() {
             value={username}
             onChange={e => setUsername(e.target.value)}
             placeholder="Ex.: 123.456.789-00"
+            className="input-dark"
             style={inputStyle}
             autoComplete="username"
             required
@@ -111,6 +112,7 @@ export default function Login() {
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="••••••••"
+            className="input-dark"
             style={inputStyle}
             autoComplete="current-password"
             required
@@ -126,7 +128,7 @@ export default function Login() {
             borderRadius: 16,
             fontSize: 16,
             background: loading ? 'rgba(0,255,127,0.55)' : '#00FF7F',
-            animation: !loading ? 'pulse 2.5s ease-in-out infinite' : 'none',
+            boxShadow: loading ? 'none' : '0 0 28px rgba(0,255,127,0.3)',
           }}
         >
           {loading ? 'Entrando...' : 'Entrar no Treino →'}

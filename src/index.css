@@ -19,6 +19,13 @@
   --color-ios-border: #2A2A2A;
 }
 
+:root {
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 0.15s;
+  --dur-base: 0.25s;
+  --dur-slow: 0.35s;
+}
+
 @keyframes slideUp {
   from { transform: translateY(16px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
@@ -61,9 +68,62 @@
   100% { transform: translateY(-80px) rotate(720deg); opacity: 0; }
 }
 
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOutDown {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(12px); }
+}
+
+@keyframes navIndicator {
+  from { transform: translateX(-50%) scaleX(0); }
+  to   { transform: translateX(-50%) scaleX(1); }
+}
+
+@keyframes barGrow {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
 body {
   background-color: var(--color-ios-background);
   color: #FFFFFF;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Feedback tátil: toda ação pressionada responde imediatamente (uso em academia). */
+button, .press {
+  transition: transform var(--dur-fast) var(--ease-out-quint), opacity var(--dur-fast) ease;
+}
+button:active:not(:disabled), .press:active {
+  transform: scale(0.97);
+}
+
+/* Foco visível para navegação por teclado/leitores — nunca outline: none sem substituto. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Campo de texto padrão do app (dark, foco em verde). */
+.input-dark {
+  transition: border-color var(--dur-base) ease, background var(--dur-base) ease;
+}
+.input-dark:focus {
+  border-color: rgba(0, 255, 127, 0.55) !important;
+  background: rgba(0, 255, 127, 0.04) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

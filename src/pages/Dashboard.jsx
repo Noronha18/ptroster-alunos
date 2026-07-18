@@ -80,7 +80,7 @@ export default function Dashboard() {
   const faltam   = metaMes - (aluno?.aulas_feitas_mes ?? 0);
 
   return (
-    <div className="min-h-screen bg-ios-background pb-4" style={{ animation: 'fadeIn 0.25s ease' }}>
+    <div className="min-h-screen bg-ios-background pb-4">
 
       {/* Header */}
       <div className="flex justify-between items-center px-5 pt-5">
@@ -160,12 +160,12 @@ export default function Dashboard() {
           <div className="px-5 py-4">
             <Link
               to={sessaoHoje ? '/treinos' : '/checkin'}
-              className="flex items-center justify-center gap-2 w-full font-black text-black rounded-2xl"
+              className="press flex items-center justify-center gap-2 w-full font-black text-black rounded-2xl"
               style={{
                 padding: '17px',
                 fontSize: 16,
                 background: '#00FF7F',
-                animation: 'pulse 2.5s ease-in-out infinite',
+                boxShadow: '0 0 24px rgba(0,255,127,0.25)',
                 letterSpacing: '-0.01em',
               }}
             >

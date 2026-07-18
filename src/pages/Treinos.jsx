@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
-import api from '../services/api';
+import { useToast } from '../hooks/useToast';
+import { Toast } from '../components/Toast';
 
 /* ─── RestTimer ─────────────────────────────────────── */
 function RestTimer({ seconds, total, onSkip }) {
@@ -34,7 +35,7 @@ function RestTimer({ seconds, total, onSkip }) {
           />
         </svg>
         <span
-          className="absolute inset-0 flex items-center justify-center text-[13px] font-bold"
+          className="absolute inset-0 flex items-center justify-center text-[13px] font-bold tabular-nums"
           style={{ color: urgent ? '#FF6B35' : '#00FF7F' }}
         >
           {seconds}
@@ -149,28 +150,39 @@ function VideoExercicio({ url }) {
 }
 
 /* ─── ExercicioAccordion ─────────────────────────────── */
-function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, onOpen, onCargaUpdate }) {
+function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, onOpen, onSalvarCarga, onErroCarga }) {
   const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
   const doneCnt = sets.filter(n => doneSets[`p${prescricao.id}_s${n}`]).length;
   const allDone = doneCnt === sets.length && sets.length > 0;
 
-  const cargaInicial = prescricao.carga_kg || prescricao.carga || '';
-  const [cargaInput, setCargaInput] = useState(cargaInicial);
+  const cargaServidor = prescricao.carga_kg || prescricao.carga || '';
+  const [cargaInput, setCargaInput] = useState(cargaServidor);
   const [salvando, setSalvando]     = useState(false);
   const [salvo, setSalvo]           = useState(false);
-  const cargaSalvaRef               = useRef(cargaInicial);
+  const cargaSalvaRef               = useRef(cargaServidor);
+  const inputRef                    = useRef(null);
+
+  // Ressincroniza quando o valor do servidor muda (ex: refetch em background
+  // substituiu o cache antigo do localStorage) — sem clobber enquanto o aluno digita/salva.
+  useEffect(() => {
+    if (salvando || document.activeElement === inputRef.current) return;
+    if (cargaServidor !== cargaSalvaRef.current) {
+      cargaSalvaRef.current = cargaServidor;
+      setCargaInput(cargaServidor);
+    }
+  }, [cargaServidor, salvando]);
 
   async function handleSalvarCarga() {
     if (cargaInput === cargaSalvaRef.current) return;
     setSalvando(true);
     try {
-      await api.patch(`/prescricoes/${prescricao.id}/carga`, { carga: cargaInput || null });
+      await onSalvarCarga(prescricao.id, cargaInput);
       cargaSalvaRef.current = cargaInput;
-      onCargaUpdate(prescricao.id, cargaInput);
       setSalvo(true);
       setTimeout(() => setSalvo(false), 2000);
     } catch {
       setCargaInput(cargaSalvaRef.current);
+      onErroCarga();
     } finally {
       setSalvando(false);
     }
@@ -231,10 +243,20 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
         </div>
       </button>
 
-      {isOpen && (
+      {/* Expansão animada via grid-template-rows (0fr → 1fr) — sem animar height. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: isOpen ? '1fr' : '0fr',
+          opacity: isOpen ? 1 : 0,
+          transition: 'grid-template-rows 0.3s var(--ease-out-quint), opacity 0.25s ease',
+        }}
+        inert={!isOpen}
+      >
+        <div style={{ overflow: 'hidden', minHeight: 0 }}>
         <div style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none', borderRadius: '0 0 14px 14px' }}>
-          {/* Vídeo de execução */}
-          {prescricao.exercicio?.video_url && (
+          {/* Vídeo de execução — montado só quando aberto (evita carregar iframes ocultos) */}
+          {isOpen && prescricao.exercicio?.video_url && (
             <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
               <p className="text-[11px] font-bold uppercase mb-2" style={{ color: '#555', letterSpacing: '0.05em' }}>
                 Execução
@@ -249,13 +271,14 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
             </p>
             <div className="flex items-center gap-2">
               <input
+                ref={inputRef}
                 type="text"
                 value={cargaInput}
                 onChange={e => setCargaInput(e.target.value)}
                 onBlur={handleSalvarCarga}
                 onKeyDown={e => e.key === 'Enter' && e.target.blur()}
                 placeholder="Ex: 60kg"
-                className="flex-1 px-3 py-2 text-sm font-bold rounded-xl"
+                className="input-dark flex-1 px-3 py-2 text-sm font-bold rounded-xl"
                 style={{
                   background: '#222',
                   border: '1.5px solid #333',
@@ -347,28 +370,25 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
             </div>
           )}
         </div>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ─── Main ───────────────────────────────────────────── */
 export default function Treinos() {
-  const navigate                       = useNavigate();
-  const { planoAtivo, loading, error } = useAluno();
+  const navigate                                       = useNavigate();
+  const { planoAtivo, loading, error, atualizarCarga } = useAluno();
+  const { toast, show }                                = useToast();
 
-  const [selectedIdx, setSelectedIdx]     = useState(0);
-  const [openPrescId, setOpenPrescId]     = useState(null);
-  const [doneSets, setDoneSets]           = useState({});
-  const [restSecs, setRestSecs]           = useState(null);
-  const [restTotal, setRestTotal]         = useState(60);
-  const [showModal, setShowModal]         = useState(false);
-  const [cargaOverrides, setCargaOverrides] = useState({});
-  const timerRef                          = useRef(null);
-
-  function handleCargaUpdate(prescricaoId, novaCarga) {
-    setCargaOverrides(prev => ({ ...prev, [prescricaoId]: novaCarga }));
-  }
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [openPrescId, setOpenPrescId] = useState(null);
+  const [doneSets, setDoneSets]       = useState({});
+  const [restSecs, setRestSecs]       = useState(null);
+  const [restTotal, setRestTotal]     = useState(60);
+  const [showModal, setShowModal]     = useState(false);
+  const timerRef                      = useRef(null);
 
   const selectedTreino = planoAtivo?.treinos?.[selectedIdx] ?? null;
 
@@ -449,7 +469,9 @@ export default function Treinos() {
   const treinos = planoAtivo.treinos;
 
   return (
-    <div className="min-h-screen bg-ios-background pb-4 relative" style={{ animation: 'fadeIn 0.25s ease' }}>
+    <div className="min-h-screen bg-ios-background pb-4 relative">
+
+      <Toast toast={toast} />
 
       {showModal && (
         <CompletionModal
@@ -494,7 +516,7 @@ export default function Treinos() {
           <span className="text-[13px] font-medium text-ios-text-secondary">
             {milestoneMsg || `${doneCnt} / ${totalSets} séries`}
           </span>
-          <span className="text-sm font-black" style={{ color: pct > 0 ? '#00FF7F' : '#555' }}>
+          <span className="text-sm font-black tabular-nums" style={{ color: pct > 0 ? '#00FF7F' : '#555' }}>
             {pct}%
           </span>
         </div>
@@ -530,16 +552,18 @@ export default function Treinos() {
       {/* Lista de exercícios */}
       <div className="px-4 mt-2 pb-4">
         {selectedTreino?.prescricoes?.map((p, idx) => (
+          <div key={p.id} style={{ animation: `slideUp 0.35s var(--ease-out-quint) ${Math.min(idx * 40, 240)}ms backwards` }}>
           <ExercicioAccordion
-            key={p.id}
             prescricao={p}
             numero={idx + 1}
             doneSets={doneSets}
             onToggle={toggleSet}
             isOpen={openPrescId === p.id}
             onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
-            onCargaUpdate={handleCargaUpdate}
+            onSalvarCarga={atualizarCarga}
+            onErroCarga={() => show('Não foi possível salvar a carga. Tente novamente.', 'error')}
           />
+          </div>
         ))}
 
         {pct > 0 && (
