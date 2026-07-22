@@ -149,8 +149,116 @@ function VideoExercicio({ url }) {
   );
 }
 
+const SET_GROUPS = {
+  biset: { label: 'Bi-set', expectedSize: 2 },
+  triset: { label: 'Tri-set', expectedSize: 3 },
+  circuito: { label: 'Circuito', expectedSize: Infinity },
+};
+
+function getSetGroupType(prescricao) {
+  const rawType = prescricao.tipo_serie
+    ?? prescricao.tipo_set
+    ?? prescricao.metodo
+    ?? prescricao.tecnica
+    ?? prescricao.modalidade
+    ?? prescricao.grupo?.tipo
+    ?? '';
+
+  const normalized = String(rawType)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[\s_-]/g, '');
+
+  if (normalized.includes('circuit')) return 'circuito';
+  if (normalized.includes('triset')) return 'triset';
+  if (normalized.includes('biset') || normalized.includes('superset')) return 'biset';
+  return null;
+}
+
+function getSetGroupId(prescricao) {
+  return prescricao.grupo_id
+    ?? prescricao.agrupamento_id
+    ?? prescricao.circuito_id
+    ?? prescricao.superset_id
+    ?? prescricao.serie_combinada_id
+    ?? prescricao.grupo?.id
+    ?? null;
+}
+
+// A API pode identificar o grupo por ID ou apenas marcar prescrições consecutivas.
+// Esta função mantém ambos os formatos compatíveis e preserva exercícios simples.
+function groupPrescricoes(prescricoes = []) {
+  const blocks = [];
+
+  prescricoes.forEach((prescricao, index) => {
+    const type = getSetGroupType(prescricao);
+    if (!type) {
+      blocks.push({ type: null, items: [{ prescricao, index }] });
+      return;
+    }
+
+    const groupId = getSetGroupId(prescricao);
+    const previous = blocks.at(-1);
+    const canJoin = previous?.type === type
+      && (groupId !== null
+        ? previous.groupId === groupId
+        : previous.groupId === null && previous.items.length < SET_GROUPS[type].expectedSize);
+
+    if (canJoin) {
+      previous.items.push({ prescricao, index });
+    } else {
+      blocks.push({ type, groupId, items: [{ prescricao, index }] });
+    }
+  });
+
+  return blocks;
+}
+
+function SetGroup({ type, children, itemCount }) {
+  const { label } = SET_GROUPS[type];
+  const sequence = Array.from({ length: itemCount }, (_, index) => String.fromCharCode(65 + index)).join(' → ');
+
+  return (
+    <section
+      className="mb-3 overflow-hidden"
+      style={{
+        border: '1px solid rgba(0,255,127,0.32)',
+        borderRadius: 14,
+        background: 'rgba(0,255,127,0.035)',
+      }}
+      aria-label={`${label} com ${itemCount} exercícios em sequência`}
+    >
+      <div
+        className="flex items-center justify-between gap-3 px-4 py-3"
+        style={{ borderBottom: '1px solid rgba(0,255,127,0.18)' }}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+            style={{ background: '#00FF7F', color: '#07130D' }}
+            aria-hidden="true"
+          >
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+              <path d="M3 5.5h7.5M8.5 3.5l2 2-2 2M14 11.5H6.5M8.5 9.5l-2 2 2 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-black text-primary">{label}</h2>
+            <p className="text-xs text-white">Faça em sequência · descanse ao final</p>
+          </div>
+        </div>
+        <span className="shrink-0 text-xs font-black tabular-nums" style={{ color: '#9CA3AF' }}>
+          {sequence}
+        </span>
+      </div>
+      <div className="px-2 pt-2">{children}</div>
+    </section>
+  );
+}
+
 /* ─── ExercicioAccordion ─────────────────────────────── */
-function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, onOpen, onSalvarCarga, onErroCarga }) {
+function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onToggle, isOpen, onOpen, onSalvarCarga, onErroCarga }) {
   const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
   const doneCnt = sets.filter(n => doneSets[`p${prescricao.id}_s${n}`]).length;
   const allDone = doneCnt === sets.length && sets.length > 0;
@@ -216,7 +324,7 @@ function ExercicioAccordion({ prescricao, numero, doneSets, onToggle, isOpen, on
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M2.5 7l3 3L11.5 4" stroke="#00FF7F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-          ) : numero}
+          ) : groupPosition ?? numero}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[15px] font-bold text-white truncate">
@@ -392,6 +500,11 @@ export default function Treinos() {
 
   const selectedTreino = planoAtivo?.treinos?.[selectedIdx] ?? null;
 
+  const exerciseBlocks = useMemo(
+    () => groupPrescricoes(selectedTreino?.prescricoes),
+    [selectedTreino],
+  );
+
   const totalSets = useMemo(
     () => selectedTreino?.prescricoes?.reduce((s, p) => s + (p.series || 0), 0) ?? 0,
     [selectedTreino],
@@ -551,20 +664,29 @@ export default function Treinos() {
 
       {/* Lista de exercícios */}
       <div className="px-4 mt-2 pb-4">
-        {selectedTreino?.prescricoes?.map((p, idx) => (
-          <div key={p.id} style={{ animation: `slideUp 0.35s var(--ease-out-quint) ${Math.min(idx * 40, 240)}ms backwards` }}>
-          <ExercicioAccordion
-            prescricao={p}
-            numero={idx + 1}
-            doneSets={doneSets}
-            onToggle={toggleSet}
-            isOpen={openPrescId === p.id}
-            onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
-            onSalvarCarga={atualizarCarga}
-            onErroCarga={() => show('Não foi possível salvar a carga. Tente novamente.', 'error')}
-          />
-          </div>
-        ))}
+        {exerciseBlocks.map((block, blockIndex) => {
+          const exercises = block.items.map(({ prescricao: p, index }, groupIndex) => (
+            <div key={p.id} style={{ animation: `slideUp 0.35s var(--ease-out-quint) ${Math.min(index * 40, 240)}ms backwards` }}>
+              <ExercicioAccordion
+                prescricao={p}
+                numero={index + 1}
+                groupPosition={block.type ? String.fromCharCode(65 + groupIndex) : null}
+                doneSets={doneSets}
+                onToggle={toggleSet}
+                isOpen={openPrescId === p.id}
+                onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
+                onSalvarCarga={atualizarCarga}
+                onErroCarga={() => show('Não foi possível salvar a carga. Tente novamente.', 'error')}
+              />
+            </div>
+          ));
+
+          return block.type ? (
+            <SetGroup key={`${block.type}-${block.groupId ?? blockIndex}`} type={block.type} itemCount={block.items.length}>
+              {exercises}
+            </SetGroup>
+          ) : exercises;
+        })}
 
         {pct > 0 && (
           <button
