@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExercicioAccordion } from './Treinos';
 
 const prescricao = {
   id: 42,
   nome_exercicio: 'Supino reto',
-  series: 3,
+  series: 2,
   repeticoes: '10',
-  carga: null,
+  carga: '60',
 };
 
-function renderExercicio(onSalvarCarga) {
+function renderExercicio(onValor, valores = {}) {
   render(
     <ExercicioAccordion
       prescricao={prescricao}
@@ -20,49 +20,30 @@ function renderExercicio(onSalvarCarga) {
       onToggle={() => {}}
       isOpen
       onOpen={() => {}}
-      onSalvarCarga={onSalvarCarga}
-      onErroCarga={() => {}}
+      valores={valores}
+      onValor={onValor}
     />,
   );
 }
 
 describe('ExercicioAccordion', () => {
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
+  afterEach(cleanup);
+
+  it('mostra reps e kg de cada série vindos do pré-preenchimento', () => {
+    renderExercicio(() => {}, { p42_s1: { reps: '12', kg: '62.5' } });
+    expect(screen.getByLabelText('Série 1, repetições')).toHaveProperty('value', '12');
+    expect(screen.getByLabelText('Série 1, carga em kg')).toHaveProperty('value', '62.5');
+    expect(screen.getByLabelText('Série 2, repetições')).toHaveProperty('value', '');
   });
 
-  it('salva a carga após o aluno parar de digitar, mesmo sem desfocar o campo', async () => {
-    vi.useFakeTimers();
-    const onSalvarCarga = vi.fn().mockResolvedValue(undefined);
-    renderExercicio(onSalvarCarga);
+  it('avisa a mudança de reps e kg pela chave da série', () => {
+    const onValor = vi.fn();
+    renderExercicio(onValor);
 
-    fireEvent.change(screen.getByPlaceholderText('Ex: 60kg'), {
-      target: { value: '72kg' },
-    });
+    fireEvent.change(screen.getByLabelText('Série 2, repetições'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('Série 2, carga em kg'), { target: { value: '70' } });
 
-    expect(onSalvarCarga).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(700);
-    });
-
-    expect(onSalvarCarga).toHaveBeenCalledOnce();
-    expect(onSalvarCarga).toHaveBeenCalledWith(42, '72kg');
-  });
-
-  it('não duplica o salvamento se o campo desfocar durante uma gravação automática', async () => {
-    vi.useFakeTimers();
-    const onSalvarCarga = vi.fn(() => new Promise(() => {}));
-    renderExercicio(onSalvarCarga);
-    const input = screen.getByPlaceholderText('Ex: 60kg');
-
-    fireEvent.change(input, { target: { value: '80kg' } });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(700);
-    });
-    fireEvent.blur(input);
-
-    expect(onSalvarCarga).toHaveBeenCalledOnce();
+    expect(onValor).toHaveBeenNthCalledWith(1, 'p42_s2', 'reps', '8');
+    expect(onValor).toHaveBeenNthCalledWith(2, 'p42_s2', 'kg', '70');
   });
 });

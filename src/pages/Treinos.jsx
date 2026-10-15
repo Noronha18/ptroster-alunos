@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
 import { useToast } from '../hooks/useToast';
 import { Toast } from '../components/Toast';
+import api from '../services/api';
+import { getAlunoId } from '../utils/auth';
+import { chaveSerie, seriesParaEnvio, valoresIniciais } from '../utils/series';
 
 /* ─── RestTimer ─────────────────────────────────────── */
 function RestTimer({ seconds, total, onSkip }) {
@@ -58,7 +61,7 @@ function RestTimer({ seconds, total, onSkip }) {
 }
 
 /* ─── CompletionModal ────────────────────────────────── */
-function CompletionModal({ onCheckin, onClose, totalSets, treinoNome }) {
+function CompletionModal({ onSalvar, salvando, onClose, totalSets, treinoNome }) {
   const COLORS = ['#00FF7F', '#FFD700', '#FF6B35', '#00BFFF', '#FF453A'];
 
   return (
@@ -99,10 +102,11 @@ function CompletionModal({ onCheckin, onClose, totalSets, treinoNome }) {
           </div>
         </div>
         <button
-          onClick={onCheckin}
-          className="w-full py-3.5 bg-primary text-black font-black rounded-2xl text-sm mb-2"
+          onClick={onSalvar}
+          disabled={salvando}
+          className="w-full py-3.5 bg-primary text-black font-black rounded-2xl text-sm mb-2 disabled:opacity-60"
         >
-          Fazer Check-in ✓
+          {salvando ? 'Salvando…' : 'Salvar treino ✓'}
         </button>
         <button
           onClick={onClose}
@@ -258,73 +262,12 @@ function SetGroup({ type, children, itemCount }) {
 }
 
 /* ─── ExercicioAccordion ─────────────────────────────── */
-export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onToggle, isOpen, onOpen, onSalvarCarga, onErroCarga }) {
+export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onToggle, isOpen, onOpen, valores, onValor }) {
   const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
-  const doneCnt = sets.filter(n => doneSets[`p${prescricao.id}_s${n}`]).length;
+  const doneCnt = sets.filter(n => doneSets[chaveSerie(prescricao.id, n)]).length;
   const allDone = doneCnt === sets.length && sets.length > 0;
 
-  const cargaServidor = prescricao.carga_kg || prescricao.carga || '';
-  const [cargaInput, setCargaInput] = useState(cargaServidor);
-  const [salvando, setSalvando]     = useState(false);
-  const [salvo, setSalvo]           = useState(false);
-  const cargaSalvaRef               = useRef(cargaServidor);
-  const inputRef                    = useRef(null);
-  const debounceCargaRef            = useRef(null);
-  const salvamentoAtualRef          = useRef(null);
-
-  // Ressincroniza quando o valor do servidor muda (ex: refetch em background
-  // substituiu o cache antigo do localStorage) — sem clobber enquanto o aluno digita/salva.
-  useEffect(() => {
-    if (salvando || document.activeElement === inputRef.current) return;
-    if (cargaServidor !== cargaSalvaRef.current) {
-      cargaSalvaRef.current = cargaServidor;
-      setCargaInput(cargaServidor);
-    }
-  }, [cargaServidor, salvando]);
-
-  const salvarCarga = useCallback(async (valor) => {
-    if (valor === cargaSalvaRef.current) return;
-    if (salvamentoAtualRef.current?.valor === valor) {
-      return salvamentoAtualRef.current.promise;
-    }
-
-    const promise = onSalvarCarga(prescricao.id, valor);
-    salvamentoAtualRef.current = { valor, promise };
-    setSalvando(true);
-    try {
-      await promise;
-      cargaSalvaRef.current = valor;
-      setSalvo(true);
-      setTimeout(() => setSalvo(false), 2000);
-    } catch {
-      onErroCarga();
-    } finally {
-      if (salvamentoAtualRef.current?.promise === promise) {
-        salvamentoAtualRef.current = null;
-      }
-      setSalvando(false);
-    }
-  }, [onErroCarga, onSalvarCarga, prescricao.id]);
-
-  useEffect(() => {
-    if (cargaInput === cargaSalvaRef.current) return undefined;
-
-    debounceCargaRef.current = setTimeout(() => {
-      debounceCargaRef.current = null;
-      salvarCarga(cargaInput);
-    }, 700);
-
-    return () => {
-      clearTimeout(debounceCargaRef.current);
-      debounceCargaRef.current = null;
-    };
-  }, [cargaInput, salvarCarga]);
-
-  function handleSalvarCarga() {
-    clearTimeout(debounceCargaRef.current);
-    debounceCargaRef.current = null;
-    return salvarCarga(cargaInput);
-  }
+  const cargaPrescrita = prescricao.carga_kg || prescricao.carga || '';
 
   return (
     <div className="mb-2">
@@ -362,7 +305,7 @@ export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets
           </p>
           <p className="text-xs text-ios-text-secondary mt-0.5">
             {prescricao.series}×{prescricao.repeticoes}
-            {cargaInput ? ` · ${cargaInput}` : ''}
+            {cargaPrescrita ? ` · ${cargaPrescrita}` : ''}
             {(prescricao.tempo_descanso_segundos ?? prescricao.descanso)
               ? ` · ${prescricao.tempo_descanso_segundos ?? prescricao.descanso}s`
               : ''}
@@ -402,44 +345,12 @@ export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets
               <VideoExercicio url={prescricao.exercicio.video_url} />
             </div>
           )}
-          {/* Input de carga */}
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-            <p className="text-[11px] font-bold uppercase mb-1.5" style={{ color: '#555', letterSpacing: '0.05em' }}>
-              Minha Carga
-            </p>
-            <div className="flex items-center gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={cargaInput}
-                onChange={e => setCargaInput(e.target.value)}
-                onBlur={handleSalvarCarga}
-                onKeyDown={e => e.key === 'Enter' && e.target.blur()}
-                placeholder="Ex: 60kg"
-                className="input-dark flex-1 px-3 py-2 text-sm font-bold rounded-xl"
-                style={{
-                  background: '#222',
-                  border: '1.5px solid #333',
-                  color: '#fff',
-                  outline: 'none',
-                }}
-              />
-              {salvando && (
-                <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#00FF7F', borderTopColor: 'transparent' }} />
-              )}
-              {salvo && !salvando && (
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M3 9l4 4L15 5" stroke="#00FF7F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </div>
-          </div>
           {/* Cabeçalho das séries */}
           <div
             className="grid px-4 py-2"
             style={{ gridTemplateColumns: '28px 1fr 1fr 48px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
           >
-            {['#', 'Reps', 'Carga', '✓'].map((h, i) => (
+            {['#', 'Reps', 'Kg', '✓'].map((h, i) => (
               <span
                 key={i}
                 className="text-[11px] font-bold uppercase"
@@ -451,7 +362,7 @@ export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets
           </div>
           {/* Linhas de série */}
           {sets.map(n => {
-            const key  = `p${prescricao.id}_s${n}`;
+            const key  = chaveSerie(prescricao.id, n);
             const done = !!doneSets[key];
             return (
               <div
@@ -465,12 +376,24 @@ export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets
                 }}
               >
                 <span className="text-[13px] font-bold" style={{ color: done ? '#00FF7F' : '#888' }}>{n}</span>
-                <span className="text-[15px] font-bold text-center" style={{ color: done ? '#00FF7F' : '#fff' }}>
-                  {prescricao.repeticoes || '—'}
-                </span>
-                <span className="text-[13px] font-medium text-center text-ios-text-secondary">
-                  {cargaInput || '—'}
-                </span>
+                <input
+                  type="number" inputMode="numeric" min="0"
+                  aria-label={`Série ${n}, repetições`}
+                  placeholder={prescricao.repeticoes || '—'}
+                  value={valores?.[key]?.reps ?? ''}
+                  onChange={e => onValor(key, 'reps', e.target.value)}
+                  className="input-dark mx-2 px-2 py-2 text-[15px] font-bold text-center rounded-xl"
+                  style={{ background: '#222', border: '1.5px solid #333', color: done ? '#00FF7F' : '#fff', outline: 'none', minWidth: 0 }}
+                />
+                <input
+                  type="number" inputMode="decimal" min="0" step="0.5"
+                  aria-label={`Série ${n}, carga em kg`}
+                  placeholder="kg"
+                  value={valores?.[key]?.kg ?? ''}
+                  onChange={e => onValor(key, 'kg', e.target.value)}
+                  className="input-dark mx-2 px-2 py-2 text-[15px] font-bold text-center rounded-xl"
+                  style={{ background: '#222', border: '1.5px solid #333', color: done ? '#00FF7F' : '#fff', outline: 'none', minWidth: 0 }}
+                />
                 <div className="flex justify-center">
                   <button
                     onClick={() => onToggle(prescricao.id, n, prescricao.tempo_descanso_segundos ?? prescricao.descanso ?? 60)}
@@ -514,10 +437,30 @@ export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets
   );
 }
 
+/* ─── Rascunho ───────────────────────────────────────── */
+const chaveRascunho = (treinoId) => `ptroster_rascunho_${getAlunoId()}_${treinoId}`;
+
+function lerRascunho(treinoId) {
+  try {
+    return JSON.parse(localStorage.getItem(chaveRascunho(treinoId)));
+  } catch {
+    return null;
+  }
+}
+
+function gravarRascunho(treinoId, rascunho) {
+  try {
+    if (rascunho) localStorage.setItem(chaveRascunho(treinoId), JSON.stringify(rascunho));
+    else localStorage.removeItem(chaveRascunho(treinoId));
+  } catch {
+    // modo privado ou storage cheio: segue sem rascunho
+  }
+}
+
 /* ─── Main ───────────────────────────────────────────── */
 export default function Treinos() {
   const navigate                                       = useNavigate();
-  const { planoAtivo, loading, error, atualizarCarga } = useAluno();
+  const { planoAtivo, loading, error }                 = useAluno();
   const { toast, show }                                = useToast();
 
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -526,6 +469,8 @@ export default function Treinos() {
   const [restSecs, setRestSecs]       = useState(null);
   const [restTotal, setRestTotal]     = useState(60);
   const [showModal, setShowModal]     = useState(false);
+  const [valores, setValores]         = useState({});
+  const [salvando, setSalvando]       = useState(false);
   const timerRef                      = useRef(null);
 
   const selectedTreino = planoAtivo?.treinos?.[selectedIdx] ?? null;
@@ -546,10 +491,56 @@ export default function Treinos() {
 
   useEffect(() => {
     setOpenPrescId(selectedTreino?.prescricoes?.[0]?.id ?? null);
-    setDoneSets({});
     setRestSecs(null);
     clearTimeout(timerRef.current);
-  }, [selectedIdx]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selectedTreino) return;
+
+    const rascunho = lerRascunho(selectedTreino.id);
+    setDoneSets(rascunho?.doneSets ?? {});
+    if (rascunho?.valores) {
+      setValores(rascunho.valores);
+      return;
+    }
+    setValores(valoresIniciais(selectedTreino.prescricoes, []));
+    let ativo = true;
+    api.get('/alunos/me/ultima-execucao', { params: { treino_id: selectedTreino.id } })
+      .then(({ data }) => { if (ativo) setValores(valoresIniciais(selectedTreino.prescricoes, data)); })
+      .catch(() => {});  // sem histórico: fica o prescrito
+    return () => { ativo = false; };
+  }, [selectedTreino?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Rascunho só depois que o aluno marcou alguma série
+  useEffect(() => {
+    if (selectedTreino && Object.keys(doneSets).length > 0) {
+      gravarRascunho(selectedTreino.id, { doneSets, valores });
+    }
+  }, [doneSets, valores]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function mudarValor(chave, campo, valor) {
+    setValores(prev => ({ ...prev, [chave]: { ...prev[chave], [campo]: valor } }));
+  }
+
+  async function salvarTreino() {
+    const series = seriesParaEnvio(selectedTreino.prescricoes, valores, chave => doneSets[chave]);
+    if (series.length === 0) {
+      show('Marque ao menos uma série com repetições.', 'error');
+      return;
+    }
+    setSalvando(true);
+    try {
+      await api.post('/sessoes/execucao', { treino_id: selectedTreino.id, series });
+      gravarRascunho(selectedTreino.id, null);
+      setShowModal(false);
+      setDoneSets({});
+      show('Treino salvo!');
+      navigate('/historico');
+    } catch {
+      // Rascunho continua salvo; o botão do modal é o "tentar de novo"
+      show('Não foi possível salvar. Toque em "Salvar treino" para tentar de novo.', 'error');
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   useEffect(() => {
     if (restSecs === null || restSecs <= 0) {
@@ -561,7 +552,7 @@ export default function Treinos() {
   }, [restSecs]);
 
   function toggleSet(prescId, setNum, descanso) {
-    const key = `p${prescId}_s${setNum}`;
+    const key = chaveSerie(prescId, setNum);
     setDoneSets(prev => {
       const nowDone  = !prev[key];
       const next     = { ...prev, [key]: nowDone };
@@ -620,7 +611,8 @@ export default function Treinos() {
         <CompletionModal
           totalSets={totalSets}
           treinoNome={selectedTreino?.nome ?? 'Treino'}
-          onCheckin={() => { setShowModal(false); navigate('/checkin'); }}
+          onSalvar={salvarTreino}
+          salvando={salvando}
           onClose={() => setShowModal(false)}
         />
       )}
@@ -705,8 +697,8 @@ export default function Treinos() {
                 onToggle={toggleSet}
                 isOpen={openPrescId === p.id}
                 onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
-                onSalvarCarga={atualizarCarga}
-                onErroCarga={() => show('Não foi possível salvar a carga. Tente novamente.', 'error')}
+                valores={valores}
+                onValor={mudarValor}
               />
             </div>
           ));
