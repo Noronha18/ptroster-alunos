@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
 import { useSessoes } from '../hooks/useSessoes';
+import { BannerAvisos } from '../components/BannerAvisos';
 
 function DumbbellIcon({ color = '#fff', size = 18 }) {
   return (
@@ -101,6 +102,8 @@ export default function Dashboard() {
           {iniciais(aluno?.nome)}
         </button>
       </div>
+
+      <BannerAvisos aluno={aluno} />
 
       {/* Card Principal */}
       <div className="px-5 mt-4">

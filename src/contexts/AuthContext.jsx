@@ -81,6 +81,15 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, [loadAluno]);
 
+  useEffect(() => {
+    const recarregar = () => {
+      const alunoId = getAlunoId();
+      if (alunoId) loadAluno(alunoId);
+    };
+    window.addEventListener('consultoria:vencida', recarregar);
+    return () => window.removeEventListener('consultoria:vencida', recarregar);
+  }, [loadAluno]);
+
   const login = async (username, password) => {
     try {
       const { data } = await api.post(

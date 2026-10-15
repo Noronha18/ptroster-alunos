@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { BottomNav } from './components/BottomNav';
 import Login from './pages/Login';
+import { BloqueioConsultoria } from './components/BloqueioConsultoria';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Treinos   = lazy(() => import('./pages/Treinos'));
@@ -11,7 +12,7 @@ const Historico = lazy(() => import('./pages/Historico'));
 const Perfil    = lazy(() => import('./pages/Perfil'));
 
 function ProtectedLayout({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, aluno } = useAuth();
   const { pathname }      = useLocation();
 
   if (loading) {
@@ -23,6 +24,7 @@ function ProtectedLayout({ children }) {
   }
 
   if (!user) return <Navigate to="/login" replace />;
+  if (aluno?.acesso_bloqueado) return <BloqueioConsultoria />;
 
   return (
     <div className="pb-20">

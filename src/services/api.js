@@ -20,6 +20,10 @@ api.interceptors.response.use(
       clearAuth();
       window.location.href = '/login';
     }
+    if (error.response?.status === 403 && error.response?.data?.message === 'consultoria_vencida') {
+      // AuthContext ouve e recarrega /alunos/me, que traz acesso_bloqueado
+      window.dispatchEvent(new Event('consultoria:vencida'));
+    }
     return Promise.reject(error);
   }
 );
