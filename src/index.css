@@ -57,10 +57,9 @@
   50%       { opacity: 0.6; }
 }
 
-@keyframes checkBounce {
-  0%   { transform: scale(0); }
-  60%  { transform: scale(1.2); }
-  100% { transform: scale(1); }
+@keyframes checkReveal {
+  from { transform: scale(0.72); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
 }
 
 @keyframes confetti {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
 import { useToast } from '../hooks/useToast';
@@ -258,7 +258,7 @@ function SetGroup({ type, children, itemCount }) {
 }
 
 /* ─── ExercicioAccordion ─────────────────────────────── */
-function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onToggle, isOpen, onOpen, onSalvarCarga, onErroCarga }) {
+export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onToggle, isOpen, onOpen, onSalvarCarga, onErroCarga }) {
   const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
   const doneCnt = sets.filter(n => doneSets[`p${prescricao.id}_s${n}`]).length;
   const allDone = doneCnt === sets.length && sets.length > 0;
@@ -269,6 +269,8 @@ function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onTog
   const [salvo, setSalvo]           = useState(false);
   const cargaSalvaRef               = useRef(cargaServidor);
   const inputRef                    = useRef(null);
+  const debounceCargaRef            = useRef(null);
+  const salvamentoAtualRef          = useRef(null);
 
   // Ressincroniza quando o valor do servidor muda (ex: refetch em background
   // substituiu o cache antigo do localStorage) — sem clobber enquanto o aluno digita/salva.
@@ -280,20 +282,48 @@ function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onTog
     }
   }, [cargaServidor, salvando]);
 
-  async function handleSalvarCarga() {
-    if (cargaInput === cargaSalvaRef.current) return;
+  const salvarCarga = useCallback(async (valor) => {
+    if (valor === cargaSalvaRef.current) return;
+    if (salvamentoAtualRef.current?.valor === valor) {
+      return salvamentoAtualRef.current.promise;
+    }
+
+    const promise = onSalvarCarga(prescricao.id, valor);
+    salvamentoAtualRef.current = { valor, promise };
     setSalvando(true);
     try {
-      await onSalvarCarga(prescricao.id, cargaInput);
-      cargaSalvaRef.current = cargaInput;
+      await promise;
+      cargaSalvaRef.current = valor;
       setSalvo(true);
       setTimeout(() => setSalvo(false), 2000);
     } catch {
-      setCargaInput(cargaSalvaRef.current);
       onErroCarga();
     } finally {
+      if (salvamentoAtualRef.current?.promise === promise) {
+        salvamentoAtualRef.current = null;
+      }
       setSalvando(false);
     }
+  }, [onErroCarga, onSalvarCarga, prescricao.id]);
+
+  useEffect(() => {
+    if (cargaInput === cargaSalvaRef.current) return undefined;
+
+    debounceCargaRef.current = setTimeout(() => {
+      debounceCargaRef.current = null;
+      salvarCarga(cargaInput);
+    }, 700);
+
+    return () => {
+      clearTimeout(debounceCargaRef.current);
+      debounceCargaRef.current = null;
+    };
+  }, [cargaInput, salvarCarga]);
+
+  function handleSalvarCarga() {
+    clearTimeout(debounceCargaRef.current);
+    debounceCargaRef.current = null;
+    return salvarCarga(cargaInput);
   }
 
   return (
@@ -317,7 +347,7 @@ function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onTog
             background: allDone ? 'rgba(0,255,127,0.1)' : '#222',
             border: `1px solid ${allDone ? 'rgba(0,255,127,0.3)' : '#333'}`,
             color: allDone ? '#00FF7F' : '#888',
-            animation: allDone ? 'checkBounce 0.4s ease' : 'none',
+            animation: allDone ? 'checkReveal 0.24s var(--ease-out-quint)' : 'none',
           }}
         >
           {allDone ? (
