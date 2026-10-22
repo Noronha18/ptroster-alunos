@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
 import { useToast } from '../hooks/useToast';
 import { Toast } from '../components/Toast';
@@ -460,6 +460,7 @@ function gravarRascunho(treinoId, rascunho) {
 /* ─── Main ───────────────────────────────────────────── */
 export default function Treinos() {
   const navigate                                       = useNavigate();
+  const [searchParams, setSearchParams]                = useSearchParams();
   const { planoAtivo, loading, error }                 = useAluno();
   const { toast, show }                                = useToast();
 
@@ -473,7 +474,13 @@ export default function Treinos() {
   const [salvando, setSalvando]       = useState(false);
   const timerRef                      = useRef(null);
 
-  const selectedTreino = planoAtivo?.treinos?.[selectedIdx] ?? null;
+  // Card "Hoje" do Dashboard abre o treino sugerido via ?treino=<id>.
+  // O índice é derivado da URL; a seleção manual limpa o parâmetro.
+  const treinoDaUrl = Number(searchParams.get('treino'));
+  const indiceDaUrl = planoAtivo?.treinos?.findIndex((treino) => treino.id === treinoDaUrl) ?? -1;
+  const indiceAtivo = indiceDaUrl >= 0 ? indiceDaUrl : selectedIdx;
+
+  const selectedTreino = planoAtivo?.treinos?.[indiceAtivo] ?? null;
 
   const exerciseBlocks = useMemo(
     () => groupPrescricoes(selectedTreino?.prescricoes),
@@ -625,11 +632,18 @@ export default function Treinos() {
             {treinos.map((t, i) => (
               <button
                 key={t.id}
-                onClick={() => setSelectedIdx(i)}
+                onClick={() => {
+                  setSelectedIdx(i);
+                  if (searchParams.has('treino')) {
+                    const proximos = new URLSearchParams(searchParams);
+                    proximos.delete('treino');
+                    setSearchParams(proximos, { replace: true });
+                  }
+                }}
                 className="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold"
                 style={{
-                  background: selectedIdx === i ? '#00FF7F' : 'rgba(255,255,255,0.06)',
-                  color: selectedIdx === i ? '#000' : '#888',
+                  background: indiceAtivo === i ? '#00FF7F' : 'rgba(255,255,255,0.06)',
+                  color: indiceAtivo === i ? '#000' : '#888',
                   transition: 'all 0.15s',
                 }}
               >

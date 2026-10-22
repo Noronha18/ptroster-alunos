@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
 import { useSessoes } from '../hooks/useSessoes';
+import { useSemana } from '../hooks/useSemana';
 import { BannerAvisos } from '../components/BannerAvisos';
 
 function DumbbellIcon({ color = '#fff', size = 18 }) {
@@ -59,11 +60,13 @@ export default function Dashboard() {
   const navigate                                                       = useNavigate();
   const { aluno, planoAtivo, loading }                                 = useAluno();
   const { sessaoHoje, historico, buscarSessaoHoje, buscarHistorico }   = useSessoes();
+  const { semana, buscarSemana }                                       = useSemana();
 
   useEffect(() => {
     buscarSessaoHoje();
     buscarHistorico();
-  }, [buscarSessaoHoje, buscarHistorico]);
+    buscarSemana();
+  }, [buscarSessaoHoje, buscarHistorico, buscarSemana]);
 
   if (loading) {
     return (
@@ -79,6 +82,10 @@ export default function Dashboard() {
   const totalEx  = planoAtivo?.treinos?.reduce((a, t) => a + (t.prescricoes?.length ?? 0), 0) ?? 0;
   const metaMes  = (aluno?.frequencia_semanal_plano ?? 0) * 4;
   const faltam   = metaMes - (aluno?.aulas_feitas_mes ?? 0);
+  const treinoSugerido = semana?.treino_sugerido_hoje ?? null;
+  const destinoTreino  = sessaoHoje || treinoSugerido
+    ? `/treinos${treinoSugerido ? `?treino=${treinoSugerido.treino_id}` : ''}`
+    : '/checkin';
 
   return (
     <div className="min-h-screen bg-ios-background pb-4">
@@ -128,17 +135,21 @@ export default function Dashboard() {
                 className="inline-block text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
                 style={{ background: 'rgba(0,255,127,0.1)', color: '#00FF7F', border: '1px solid rgba(0,255,127,0.2)', letterSpacing: '0.06em' }}
               >
-                {planoAtivo ? 'Treino de Hoje' : 'Sem Plano'}
+                {treinoSugerido || planoAtivo ? 'Treino de Hoje' : 'Sem Plano'}
               </span>
             )}
             <h2 className="text-[26px] font-black text-white mt-3" style={{ letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              {planoAtivo?.titulo ?? 'Nenhum plano ativo'}
+              {treinoSugerido?.treino_nome ?? planoAtivo?.titulo ?? 'Nenhum plano ativo'}
             </h2>
-            {planoAtivo?.objetivo_estrategico && (
+            {treinoSugerido ? (
+              <p className="text-[13px] font-medium text-ios-text-secondary mt-1.5">
+                Sugerido para hoje{planoAtivo?.titulo ? ` · ${planoAtivo.titulo}` : ''}
+              </p>
+            ) : planoAtivo?.objetivo_estrategico ? (
               <p className="text-[13px] font-medium text-ios-text-secondary mt-1.5">
                 {planoAtivo.objetivo_estrategico}
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* Stats */}
@@ -162,7 +173,7 @@ export default function Dashboard() {
           {/* CTA */}
           <div className="px-5 py-4">
             <Link
-              to={sessaoHoje ? '/treinos' : '/checkin'}
+              to={destinoTreino}
               className="press flex items-center justify-center gap-2 w-full font-black text-black rounded-2xl"
               style={{
                 padding: '17px',
@@ -173,7 +184,7 @@ export default function Dashboard() {
               }}
             >
               <DumbbellIcon color="#000" size={18} />
-              {sessaoHoje ? 'Ver Treino de Hoje →' : 'Fazer Check-in →'}
+              {sessaoHoje ? 'Ver Treino de Hoje →' : treinoSugerido ? 'Começar Treino →' : 'Fazer Check-in →'}
             </Link>
           </div>
         </div>
@@ -210,6 +221,28 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+
+        {semana?.treinos?.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {semana.treinos.map((treino) => {
+              const completo = treino.feitas >= treino.vezes_por_semana;
+              const feitas = Math.min(treino.feitas, treino.vezes_por_semana);
+              return (
+                <span
+                  key={treino.treino_id}
+                  className="px-3 py-1.5 rounded-xl text-[12px] font-bold"
+                  style={{
+                    background: completo ? 'rgba(0,255,127,0.12)' : 'rgba(255,255,255,0.06)',
+                    color: completo ? '#00FF7F' : '#888',
+                    border: `1px solid ${completo ? 'rgba(0,255,127,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                  }}
+                >
+                  {treino.treino_nome} {feitas}/{treino.vezes_por_semana}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Últimas sessões */}
