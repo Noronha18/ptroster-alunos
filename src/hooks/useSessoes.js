@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
 import api from '../services/api';
 import { getAlunoId } from '../utils/auth';
+import { dataLocalISO } from '../utils/date';
 
 export function useSessoes() {
   const [sessaoHoje, setSessaoHoje] = useState(null);
-  const [loadingSessao, setLoadingSessao] = useState(false);
+  const [loadingSessao, setLoadingSessao] = useState(true);
   const [checkingIn, setCheckingIn] = useState(false);
 
   const [historico, setHistorico] = useState([]);
@@ -12,10 +13,13 @@ export function useSessoes() {
 
   const buscarSessaoHoje = useCallback(async () => {
     const alunoId = getAlunoId();
-    if (!alunoId) return;
+    if (!alunoId) {
+      setLoadingSessao(false);
+      return;
+    }
     setLoadingSessao(true);
     try {
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataLocalISO();
       const { data } = await api.get('/sessoes/', {
         params: { aluno_id: alunoId, de: hoje, ate: hoje, realizada: true },
       });

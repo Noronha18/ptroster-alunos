@@ -4,6 +4,7 @@ import { useAluno } from '../hooks/useAluno';
 import { useSessoes } from '../hooks/useSessoes';
 import { useSemana } from '../hooks/useSemana';
 import { BannerAvisos } from '../components/BannerAvisos';
+import { calcularStreak, getUltimos7Dias, resolverCardHoje } from '../utils/dashboard';
 
 function DumbbellIcon({ color = '#fff', size = 18 }) {
   return (
@@ -33,34 +34,11 @@ const formatarDataCurta = () => {
   return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]}`;
 };
 
-function calcularStreak(historico) {
-  const dates = new Set(historico.map(s => s.data_hora.split('T')[0]));
-  let streak = 0;
-  while (streak < 365) {
-    const d = new Date();
-    d.setDate(d.getDate() - streak);
-    if (dates.has(d.toISOString().split('T')[0])) streak++;
-    else break;
-  }
-  return streak;
-}
-
-function getUltimos7Dias(historico) {
-  const dates  = new Set(historico.map(s => s.data_hora.split('T')[0]));
-  const semana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dateStr = d.toISOString().split('T')[0];
-    return { label: semana[d.getDay()], done: dates.has(dateStr), isToday: i === 6 };
-  });
-}
-
 export default function Dashboard() {
   const navigate                                                       = useNavigate();
-  const { aluno, planoAtivo, loading }                                 = useAluno();
-  const { sessaoHoje, historico, buscarSessaoHoje, buscarHistorico }   = useSessoes();
-  const { semana, buscarSemana }                                       = useSemana();
+  const { aluno, planoAtivo, loading }                                       = useAluno();
+  const { sessaoHoje, historico, loadingSessao, buscarSessaoHoje, buscarHistorico } = useSessoes();
+  const { semana, loadingSemana, buscarSemana }                             = useSemana();
 
   useEffect(() => {
     buscarSessaoHoje();
@@ -82,10 +60,13 @@ export default function Dashboard() {
   const totalEx  = planoAtivo?.treinos?.reduce((a, t) => a + (t.prescricoes?.length ?? 0), 0) ?? 0;
   const metaMes  = (aluno?.frequencia_semanal_plano ?? 0) * 4;
   const faltam   = metaMes - (aluno?.aulas_feitas_mes ?? 0);
-  const treinoSugerido = semana?.treino_sugerido_hoje ?? null;
-  const destinoTreino  = sessaoHoje || treinoSugerido
-    ? `/treinos${treinoSugerido ? `?treino=${treinoSugerido.treino_id}` : ''}`
-    : '/checkin';
+  const card = resolverCardHoje({
+    sessaoHoje,
+    treinoSugerido: semana?.treino_sugerido_hoje ?? null,
+    planoAtivo,
+    treinosSemana: semana?.treinos ?? [],
+    carregando: loadingSessao || loadingSemana,
+  });
 
   return (
     <div className="min-h-screen bg-ios-background pb-4">
@@ -123,33 +104,20 @@ export default function Dashboard() {
               borderBottom: '1px solid rgba(0,255,127,0.1)',
             }}
           >
-            {sessaoHoje ? (
-              <span
-                className="inline-block text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
-                style={{ background: 'rgba(0,255,127,0.1)', color: '#00FF7F', border: '1px solid rgba(0,255,127,0.2)', letterSpacing: '0.06em' }}
-              >
-                ✓ Presença Confirmada
-              </span>
-            ) : (
-              <span
-                className="inline-block text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
-                style={{ background: 'rgba(0,255,127,0.1)', color: '#00FF7F', border: '1px solid rgba(0,255,127,0.2)', letterSpacing: '0.06em' }}
-              >
-                {treinoSugerido || planoAtivo ? 'Treino de Hoje' : 'Sem Plano'}
-              </span>
-            )}
+            <span
+              className="inline-block text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
+              style={{ background: 'rgba(0,255,127,0.1)', color: '#00FF7F', border: '1px solid rgba(0,255,127,0.2)', letterSpacing: '0.06em' }}
+            >
+              {card.badge}
+            </span>
             <h2 className="text-[26px] font-black text-white mt-3" style={{ letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              {treinoSugerido?.treino_nome ?? planoAtivo?.titulo ?? 'Nenhum plano ativo'}
+              {card.nomeTreino}
             </h2>
-            {treinoSugerido ? (
+            {card.subtitulo && (
               <p className="text-[13px] font-medium text-ios-text-secondary mt-1.5">
-                Sugerido para hoje{planoAtivo?.titulo ? ` · ${planoAtivo.titulo}` : ''}
+                {card.subtitulo}
               </p>
-            ) : planoAtivo?.objetivo_estrategico ? (
-              <p className="text-[13px] font-medium text-ios-text-secondary mt-1.5">
-                {planoAtivo.objetivo_estrategico}
-              </p>
-            ) : null}
+            )}
           </div>
 
           {/* Stats */}
@@ -173,8 +141,12 @@ export default function Dashboard() {
           {/* CTA */}
           <div className="px-5 py-4">
             <Link
-              to={destinoTreino}
-              className="press flex items-center justify-center gap-2 w-full font-black text-black rounded-2xl"
+              to={card.desabilitado ? '#' : card.destino}
+              onClick={card.desabilitado ? (event) => event.preventDefault() : undefined}
+              aria-disabled={card.desabilitado}
+              aria-busy={card.desabilitado}
+              tabIndex={card.desabilitado ? -1 : undefined}
+              className={`press flex items-center justify-center gap-2 w-full font-black text-black rounded-2xl ${card.desabilitado ? 'opacity-60 pointer-events-none' : ''}`}
               style={{
                 padding: '17px',
                 fontSize: 16,
@@ -184,7 +156,7 @@ export default function Dashboard() {
               }}
             >
               <DumbbellIcon color="#000" size={18} />
-              {sessaoHoje ? 'Ver Treino de Hoje →' : treinoSugerido ? 'Começar Treino →' : 'Fazer Check-in →'}
+              {card.cta}
             </Link>
           </div>
         </div>
@@ -193,7 +165,7 @@ export default function Dashboard() {
       {/* Tracker semanal */}
       <div className="px-5 mt-6">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-[15px] font-bold text-white">Esta Semana</h3>
+          <h3 className="text-[15px] font-bold text-white">Últimos 7 dias</h3>
           <span className="text-[13px] font-medium text-ios-text-secondary">
             {ultimos7.filter(d => d.done).length} / 7
           </span>
@@ -223,24 +195,34 @@ export default function Dashboard() {
         </div>
 
         {semana?.treinos?.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {semana.treinos.map((treino) => {
-              const completo = treino.feitas >= treino.vezes_por_semana;
-              const feitas = Math.min(treino.feitas, treino.vezes_por_semana);
-              return (
-                <span
-                  key={treino.treino_id}
-                  className="px-3 py-1.5 rounded-xl text-[12px] font-bold"
-                  style={{
-                    background: completo ? 'rgba(0,255,127,0.12)' : 'rgba(255,255,255,0.06)',
-                    color: completo ? '#00FF7F' : '#888',
-                    border: `1px solid ${completo ? 'rgba(0,255,127,0.25)' : 'rgba(255,255,255,0.08)'}`,
-                  }}
-                >
-                  {treino.treino_nome} {feitas}/{treino.vezes_por_semana}
-                </span>
-              );
-            })}
+          <div className="mt-5">
+            <h3 className="text-[15px] font-bold text-white mb-2">Esta Semana</h3>
+            <div
+              className="flex flex-wrap gap-2"
+              role="list"
+              aria-label="Progresso semanal por treino"
+            >
+              {semana.treinos.map((treino) => {
+                const completo = treino.feitas >= treino.vezes_por_semana;
+                const label = `${treino.treino_nome}: ${treino.feitas} de ${treino.vezes_por_semana} sessões`;
+                return (
+                  <span
+                    key={treino.treino_id}
+                    role="listitem"
+                    aria-label={label}
+                    title={label}
+                    className="px-3 py-1.5 rounded-xl text-[12px] font-bold max-w-full truncate"
+                    style={{
+                      background: completo ? 'rgba(0,255,127,0.12)' : 'rgba(255,255,255,0.06)',
+                      color: completo ? '#00FF7F' : '#888',
+                      border: `1px solid ${completo ? 'rgba(0,255,127,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                    }}
+                  >
+                    {treino.treino_nome} {treino.feitas}/{treino.vezes_por_semana}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

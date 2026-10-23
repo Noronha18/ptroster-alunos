@@ -3,7 +3,7 @@ import api from '../services/api';
 
 export function useSemana() {
   const [semana, setSemana] = useState(null);
-  const [loadingSemana, setLoadingSemana] = useState(false);
+  const [loadingSemana, setLoadingSemana] = useState(true);
 
   const buscarSemana = useCallback(async () => {
     setLoadingSemana(true);

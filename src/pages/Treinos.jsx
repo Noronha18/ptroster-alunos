@@ -6,6 +6,7 @@ import { Toast } from '../components/Toast';
 import api from '../services/api';
 import { getAlunoId } from '../utils/auth';
 import { chaveSerie, seriesParaEnvio, valoresIniciais } from '../utils/series';
+import { indiceTreinoDaUrl } from '../utils/treino';
 
 /* ─── RestTimer ─────────────────────────────────────── */
 function RestTimer({ seconds, total, onSkip }) {
@@ -476,11 +477,20 @@ export default function Treinos() {
 
   // Card "Hoje" do Dashboard abre o treino sugerido via ?treino=<id>.
   // O índice é derivado da URL; a seleção manual limpa o parâmetro.
-  const treinoDaUrl = Number(searchParams.get('treino'));
-  const indiceDaUrl = planoAtivo?.treinos?.findIndex((treino) => treino.id === treinoDaUrl) ?? -1;
+  const temTreinoNaUrl = searchParams.has('treino');
+  const treinoParam = searchParams.get('treino');
+  const indiceDaUrl = indiceTreinoDaUrl(planoAtivo?.treinos, treinoParam);
   const indiceAtivo = indiceDaUrl >= 0 ? indiceDaUrl : selectedIdx;
 
   const selectedTreino = planoAtivo?.treinos?.[indiceAtivo] ?? null;
+
+  // Parâmetro antigo/inválido não pode deixar a tela presa no treino errado.
+  useEffect(() => {
+    if (!planoAtivo || !temTreinoNaUrl || indiceDaUrl >= 0) return;
+    const proximos = new URLSearchParams(searchParams);
+    proximos.delete('treino');
+    setSearchParams(proximos, { replace: true });
+  }, [planoAtivo, temTreinoNaUrl, indiceDaUrl, searchParams, setSearchParams]);
 
   const exerciseBlocks = useMemo(
     () => groupPrescricoes(selectedTreino?.prescricoes),
