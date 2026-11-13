@@ -22,7 +22,7 @@ const DumbbellIcon = ({ active }) => (
 const CheckinIcon = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z" fill={active ? 'currentColor' : 'none'} strokeWidth={active ? 0 : 1.8}/>
-    <circle cx="12" cy="10" r="3" fill={active ? '#000' : 'none'} stroke={active ? 'none' : 'currentColor'} strokeWidth="1.8"/>
+    <circle cx="12" cy="10" r="3" fill={active ? 'var(--color-primary)' : 'none'} stroke={active ? 'none' : 'currentColor'} strokeWidth="1.8"/>
   </svg>
 );
 
@@ -50,38 +50,32 @@ const navItems = [
 export function BottomNav() {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40"
+      className="fixed bottom-0 inset-x-0 z-40 bg-bg border-t border-line pb-[env(safe-area-inset-bottom)]"
       aria-label="Navegação principal"
-      style={{
-        background: 'rgba(13,13,13,0.97)',
-        backdropFilter: 'blur(24px)',
-        borderTop: '1px solid rgba(255,255,255,0.07)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
     >
-      <div className="flex items-stretch max-w-lg mx-auto" style={{ height: 64 }}>
+      <div className="flex items-stretch max-w-lg mx-auto h-16">
         {navItems.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
-            aria-label={label}
             className={({ isActive }) =>
-              `flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors ${
-                isActive ? 'text-primary' : 'text-ios-text-secondary'
+              `flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-colors ${
+                isActive ? 'text-ink' : 'text-ink-muted'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                {isActive && (
-                  <div
-                    className="absolute top-0 left-1/2 -translate-x-1/2 rounded-b"
-                    style={{ width: 28, height: 2.5, background: '#00FF7F', animation: 'navIndicator 0.3s var(--ease-out-quint)' }}
-                  />
-                )}
-                <Icon active={isActive} />
-                <span className="text-[10px] font-bold" style={{ letterSpacing: '0.02em' }}>{label}</span>
+                {/* Pílula cheia marca a aba atual: forma + cor, legível de relance. */}
+                <span
+                  className={`flex items-center justify-center w-14 h-8 rounded-full transition-colors ${
+                    isActive ? 'bg-primary text-on-primary' : ''
+                  }`}
+                >
+                  <Icon active={isActive} />
+                </span>
+                {label}
               </>
             )}
           </NavLink>

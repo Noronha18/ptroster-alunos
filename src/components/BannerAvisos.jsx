@@ -15,7 +15,7 @@ export function BannerAvisos({ aluno }) {
   }
   if (avisos.length === 0) return null;
   return (
-    <div role="status" className="mx-5 mt-4 rounded-2xl px-4 py-3 bg-warning/15 border border-warning/30 text-white text-sm font-medium space-y-1">
+    <div role="status" className="rounded-2xl px-4 py-3 bg-alert/15 border border-alert/30 text-ink text-[15px] font-medium space-y-1">
       {avisos.map((t) => <p key={t}>{t}</p>)}
     </div>
   );

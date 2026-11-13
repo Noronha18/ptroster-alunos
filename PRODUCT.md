@@ -43,8 +43,8 @@ Portal móvel conectado à rotina do personal trainer: o aluno executa e registr
 - Nome do produto: PTRoster.
 - Voz motivacional, direta e focada, sem floreios.
 - A experiência deve transmitir energia de treino sem recorrer a gamificação excessiva.
-- O verde neon representa progresso, conclusão e vitória.
-- Preservar o tema escuro e o verde neon `#00FF7F` como único acento de marca, conforme o contexto anterior confirmado. Cores semânticas de erro e alerta devem ser diferenciadas de acentos decorativos.
+- O lima "volt" `#C8FF2E` representa progresso, conclusão e vitória.
+- Tema escuro grafite com o lima como único acento de marca (decisão de 2026-11-13, substitui o verde neon `#00FF7F`). Tokens em `src/index.css` e `src/themes/ptroster/ptrosterTheme.ts`. Cores semânticas de erro e alerta devem ser diferenciadas de acentos decorativos.
 - Evitar aparência clínica, dashboards densos e distrações que disputem atenção com o treino.
 
 ## Evidence on Hand

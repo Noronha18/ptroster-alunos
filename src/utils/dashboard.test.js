@@ -41,7 +41,7 @@ describe('resolverCardHoje', () => {
 
     expect(card.nomeTreino).toBe('Treino B');
     expect(card.destino).toBe('/treinos?treino=20');
-    expect(card.cta).toBe('Ver Treino de Hoje →');
+    expect(card.cta).toBe('Ver treino de hoje');
   });
 
   it('mostra o treino da sessão mesmo quando ele veio de um plano anterior', () => {
@@ -55,7 +55,7 @@ describe('resolverCardHoje', () => {
 
     expect(card.nomeTreino).toBe('Treino Antigo');
     expect(card.destino).toBe('/treinos');
-    expect(card.cta).toBe('Ver Treinos →');
+    expect(card.cta).toBe('Ver treinos');
   });
 
   it('sem treino na sessão, aponta para a lista de treinos', () => {
@@ -67,7 +67,7 @@ describe('resolverCardHoje', () => {
     });
 
     expect(card.destino).toBe('/treinos');
-    expect(card.cta).toBe('Ver Treinos →');
+    expect(card.cta).toBe('Ver treinos');
   });
 
   it('sem sessão, usa o treino sugerido', () => {
@@ -79,7 +79,7 @@ describe('resolverCardHoje', () => {
     });
 
     expect(card.destino).toBe('/treinos?treino=10');
-    expect(card.cta).toBe('Começar Treino →');
+    expect(card.cta).toBe('Começar treino');
   });
 
   it('sem sessão nem sugestão, cai no check-in', () => {
@@ -91,7 +91,7 @@ describe('resolverCardHoje', () => {
     });
 
     expect(card.destino).toBe('/checkin');
-    expect(card.cta).toBe('Fazer Check-in →');
+    expect(card.cta).toBe('Fazer check-in');
   });
 });
 

@@ -20,6 +20,13 @@ export function calcularStreak(historico = [], hoje = new Date()) {
   return streak;
 }
 
+export function treinosNoMes(historico = [], hoje = new Date()) {
+  return historico.filter((sessao) => {
+    const d = new Date(sessao.data_hora);
+    return d.getMonth() === hoje.getMonth() && d.getFullYear() === hoje.getFullYear();
+  }).length;
+}
+
 export function getUltimos7Dias(historico = [], hoje = new Date()) {
   const datas = datasDasSessoes(historico);
   return Array.from({ length: 7 }, (_, i) => {
@@ -77,16 +84,16 @@ export function resolverCardHoje({
   const cta = carregando
     ? 'Carregando...'
     : sessaoHoje
-      ? (treinoDoPlano ? 'Ver Treino de Hoje →' : 'Ver Treinos →')
+      ? (treinoDoPlano ? 'Ver treino de hoje' : 'Ver treinos')
       : treinoSugerido
-        ? 'Começar Treino →'
-        : 'Fazer Check-in →';
+        ? 'Começar treino'
+        : 'Fazer check-in';
 
   const badge = carregando
     ? 'Carregando'
     : sessaoHoje
-      ? '✓ Presença Confirmada'
-      : (treinoSugerido || planoAtivo ? 'Treino de Hoje' : 'Sem Plano');
+      ? 'Presença confirmada'
+      : (treinoSugerido || planoAtivo ? 'Treino de hoje' : 'Sem plano');
 
   return {
     treinoFeito,

@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 import { useSessoes } from '../hooks/useSessoes';
 import { useAluno } from '../hooks/useAluno';
+import { Button } from '@astryxdesign/core/Button';
+import { PageLoader } from '../components/PageLoader';
+import { CheckIcon, FlameIcon } from '../components/icons';
+import { calcularStreak, treinosNoMes } from '../utils/dashboard';
 
 const getDiaSemana = (dataHora) => {
   const dias = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -21,67 +25,26 @@ function getWeeklyData(historico) {
   return weeks.reverse().map((count, i) => ({ label: i === 7 ? 'Atual' : `S${i + 1}`, count }));
 }
 
-function calcularStreak(historico) {
-  const dates = new Set(historico.map(s => s.data_hora.split('T')[0]));
-  let streak = 0;
-  while (streak < 365) {
-    const d = new Date();
-    d.setDate(d.getDate() - streak);
-    if (dates.has(d.toISOString().split('T')[0])) streak++;
-    else break;
-  }
-  return streak;
-}
-
-function getThisMonth(historico) {
-  const now = new Date();
-  return historico.filter(s => {
-    const d = new Date(s.data_hora);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }).length;
-}
-
 function WeeklyBars({ data }) {
   const maxCount = Math.max(...data.map(d => d.count), 1);
   return (
-    <div>
-      <div className="flex items-end gap-1.5" style={{ height: 80 }}>
-        {data.map((d, i) => {
-          const isLast = i === data.length - 1;
-          const barH   = maxCount > 0 ? (d.count / maxCount) * 72 : 0;
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5">
-              {d.count > 0 && (
-                <span className="text-[9px] font-bold" style={{ color: isLast ? '#00FF7F' : '#888' }}>
-                  {d.count}
-                </span>
-              )}
-              <div
-                className="w-full rounded-t"
-                style={{
-                  height: Math.max(barH, d.count > 0 ? 4 : 2),
-                  background: isLast ? '#00FF7F' : 'rgba(0,255,127,0.28)',
-                  minHeight: 2,
-                  transformOrigin: 'bottom',
-                  animation: `barGrow 0.5s var(--ease-out-quint) ${i * 40}ms backwards`,
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex gap-1.5 mt-1.5">
-        {data.map((d, i) => (
-          <span key={i} className="flex-1 text-center text-[9px]" style={{ color: i === data.length - 1 ? '#00FF7F' : '#555' }}>
-            {d.label}
-          </span>
-        ))}
-      </div>
-    </div>
+    <ol className="flex items-end gap-2 h-32" aria-label="Sessões por semana, das mais antigas para a atual">
+      {data.map((d, i) => {
+        const atual = i === data.length - 1;
+        return (
+          <li key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-1" aria-label={`${d.label}: ${d.count} sessões`}>
+            <span className={`num text-[13px] font-bold ${atual ? 'text-primary' : 'text-ink-muted'}`}>{d.count || ''}</span>
+            <span
+              className={`w-full rounded-t-md origin-bottom animate-[barGrow_0.5s_var(--ease-out-quint)_backwards] ${atual ? 'bg-primary' : 'bg-primary/30'}`}
+              style={{ height: `${Math.max((d.count / maxCount) * 100, 3)}%`, animationDelay: `${i * 40}ms` }}
+            />
+            <span className={`text-[12px] ${atual ? 'text-ink font-semibold' : 'text-ink-dim'}`}>{d.label}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
-
-const ICONES_ATIVIDADE = { Corrida: '🏃', Cardio: '🔥', Natação: '🏊', Funcional: '⚡' };
 
 const labelSessao = (sessao, planos) => {
   if (sessao.tipo_atividade) return sessao.tipo_atividade;
@@ -92,123 +55,80 @@ const labelSessao = (sessao, planos) => {
   return 'Sessão Presencial';
 };
 
-const iconesSessao = (sessao, index) => {
-  if (index === 0) return '⚡';
-  if (sessao.tipo_atividade) return ICONES_ATIVIDADE[sessao.tipo_atividade] ?? '🏋️';
-  return '✓';
-};
-
 export default function Historico() {
   const { historico, loadingHistorico, buscarHistorico } = useSessoes();
   const { aluno } = useAluno();
 
   useEffect(() => { buscarHistorico(); }, [buscarHistorico]);
 
-  if (loadingHistorico) {
+  if (loadingHistorico) return <PageLoader />;
+
+  if (historico.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-ios-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-[calc(100dvh-5rem)] bg-bg px-5 pt-5 max-w-lg mx-auto">
+        <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">Histórico</h1>
+        <p className="mt-3 text-[17px] text-ink-muted">
+          Nenhum treino registrado ainda. Faça seu primeiro check-in e ele aparece aqui.
+        </p>
+        <div className="mt-6">
+          <Button variant="primary" size="lg" width="100%" className="min-h-14 text-[17px] font-bold" label="Fazer check-in" href="/checkin" />
+        </div>
       </div>
     );
   }
 
   const weeklyData = getWeeklyData(historico);
   const streak     = calcularStreak(historico);
-  const thisMes    = getThisMonth(historico);
+  const thisMes    = treinosNoMes(historico);
 
   return (
-    <div className="min-h-screen bg-ios-background pb-6">
-      <div className="px-5 pt-6 mb-4">
-        <h1 className="text-[28px] font-black text-white mb-1" style={{ letterSpacing: '-0.02em' }}>Histórico</h1>
-        <p className="text-[14px] text-ios-text-secondary">Últimas 8 semanas</p>
-      </div>
+    <div className="min-h-screen bg-bg px-5 pt-5 pb-6 max-w-lg mx-auto flex flex-col gap-7">
+      <header>
+        <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">Histórico</h1>
+        <p className="mt-1 text-[15px] text-ink-muted">Últimas 8 semanas</p>
+      </header>
 
-      {/* Gráfico semanal */}
-      {historico.length > 0 && (
-        <div className="mx-5 mb-4">
-          <div className="rounded-2xl p-5" style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-[11px] font-bold text-ios-text-secondary uppercase mb-1" style={{ letterSpacing: '0.06em' }}>
-                  Sessões por Semana
-                </p>
-                <p className="text-[30px] font-black text-white leading-none">
-                  {weeklyData[weeklyData.length - 1].count}
-                  <span className="text-sm font-medium text-ios-text-secondary ml-1">esta semana</span>
+      <section className="rounded-2xl bg-surface border border-line p-5" aria-labelledby="por-semana">
+        <h2 id="por-semana" className="text-[15px] font-semibold text-ink-muted">Sessões por semana</h2>
+        <p className="mt-1 mb-5 text-[16px] text-ink-muted">
+          <span className="num text-[36px] leading-none font-black text-ink">{weeklyData[weeklyData.length - 1].count}</span> esta semana
+        </p>
+        <WeeklyBars data={weeklyData} />
+
+        <dl className="mt-5 pt-4 border-t border-line grid grid-cols-3 gap-3">
+          <div>
+            <dt className="text-[13px] text-ink-muted">Este mês</dt>
+            <dd className="num text-[22px] font-bold text-ink">{thisMes}</dd>
+          </div>
+          <div>
+            <dt className="text-[13px] text-ink-muted">Total</dt>
+            <dd className="num text-[22px] font-bold text-ink">{historico.length}</dd>
+          </div>
+          <div>
+            <dt className="text-[13px] text-ink-muted">Sequência</dt>
+            <dd className={`num flex items-center gap-1 text-[22px] font-bold ${streak > 0 ? 'text-alert' : 'text-ink'}`}>
+              <FlameIcon size={18} /> {streak} <span className="text-[14px] font-semibold">{streak === 1 ? 'dia' : 'dias'}</span>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="registro">
+        <h2 id="registro" className="text-[18px] font-bold text-ink mb-1">Registro de treinos</h2>
+        <ul className="divide-y divide-line border-y border-line">
+          {historico.map(sessao => (
+            <li key={sessao.id} className="flex items-center justify-between gap-3 py-3.5">
+              <div className="min-w-0">
+                <p className="text-[16px] font-semibold text-ink truncate">{labelSessao(sessao, aluno?.planos_treino)}</p>
+                <p className="text-[14px] text-ink-muted mt-0.5">
+                  {getDiaSemana(sessao.data_hora)} · {formatarData(sessao.data_hora)}
                 </p>
               </div>
-              <span
-                className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
-                style={{ background: 'rgba(0,255,127,0.1)', color: '#00FF7F', border: '1px solid rgba(0,255,127,0.2)', letterSpacing: '0.06em' }}
-              >
-                {thisMes} no mês
-              </span>
-            </div>
-            <WeeklyBars data={weeklyData} />
-          </div>
-        </div>
-      )}
-
-      {/* Stats */}
-      {historico.length > 0 && (
-        <div className="mx-5 grid grid-cols-3 gap-2 mb-4">
-          {[
-            { label: 'Este mês', value: thisMes,          accent: false },
-            { label: 'Total',    value: historico.length, accent: false },
-            { label: 'Sequência', value: `${streak}d 🔥`, accent: true  },
-          ].map((s, i) => (
-            <div key={i} className="rounded-2xl p-3 text-center" style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[22px] font-black" style={{ color: s.accent ? '#00FF7F' : '#fff' }}>{s.value}</p>
-              <p className="text-[10px] font-bold text-ios-text-secondary uppercase mt-1" style={{ letterSpacing: '0.04em' }}>{s.label}</p>
-            </div>
+              <span className="text-primary shrink-0"><CheckIcon /></span>
+            </li>
           ))}
-        </div>
-      )}
-
-      {/* Lista de sessões */}
-      <div className="px-5">
-        <h3 className="text-[15px] font-bold text-white mb-3">Registro de Treinos</h3>
-
-        {historico.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ background: '#1A1A1A' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-            </div>
-            <p className="text-ios-text-secondary font-medium">Nenhuma sessão registrada ainda.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {historico.map((sessao, i) => (
-              <div
-                key={sessao.id}
-                className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-                style={{
-                  background: i === 0 ? 'rgba(0,255,127,0.06)' : '#1A1A1A',
-                  border: `1px solid ${i === 0 ? 'rgba(0,255,127,0.18)' : 'rgba(255,255,255,0.07)'}`,
-                  animation: `slideUp 0.35s var(--ease-out-quint) ${Math.min(i * 35, 280)}ms backwards`,
-                }}
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base"
-                  style={{ background: i === 0 ? 'rgba(0,255,127,0.1)' : '#222' }}
-                >
-                  {iconesSessao(sessao, i)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-bold text-white truncate">
-                    {labelSessao(sessao, aluno?.planos_treino)}
-                  </p>
-                  <p className="text-xs text-ios-text-secondary mt-0.5">
-                    {getDiaSemana(sessao.data_hora)} · {formatarData(sessao.data_hora)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        </ul>
+      </section>
     </div>
   );
 }

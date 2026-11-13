@@ -1,22 +1,13 @@
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Button } from '@astryxdesign/core/Button';
 import { useAluno } from '../hooks/useAluno';
 import { useSessoes } from '../hooks/useSessoes';
 import { useSemana } from '../hooks/useSemana';
 import { BannerAvisos } from '../components/BannerAvisos';
+import { PageLoader } from '../components/PageLoader';
+import { CheckIcon, DumbbellIcon, FlameIcon, TargetIcon } from '../components/icons';
 import { calcularStreak, getUltimos7Dias, resolverCardHoje } from '../utils/dashboard';
-
-function DumbbellIcon({ color = '#fff', size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="2"  y="9"  width="3" height="6" rx="1.5" fill={color}/>
-      <rect x="6"  y="7"  width="3" height="10" rx="1.5" fill={color}/>
-      <rect x="15" y="7"  width="3" height="10" rx="1.5" fill={color}/>
-      <rect x="19" y="9"  width="3" height="6" rx="1.5" fill={color}/>
-      <rect x="9"  y="11" width="6" height="2" rx="1" fill={color}/>
-    </svg>
-  );
-}
 
 const primeiroNome = (nome) => nome?.split(' ')[0] ?? 'Atleta';
 
@@ -46,13 +37,7 @@ export default function Dashboard() {
     buscarSemana();
   }, [buscarSessaoHoje, buscarHistorico, buscarSemana]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-ios-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
 
   const streak   = calcularStreak(historico);
   const ultimos7 = getUltimos7Dias(historico);
@@ -68,140 +53,110 @@ export default function Dashboard() {
     carregando: loadingSessao || loadingSemana,
   });
 
-  return (
-    <div className="min-h-screen bg-ios-background pb-4">
+  const diasFeitos = ultimos7.filter(d => d.done).length;
 
-      {/* Header */}
-      <div className="flex justify-between items-center px-5 pt-5">
-        <div>
-          <p className="text-xs font-medium text-ios-text-secondary">
-            {formatarDataCurta()}{streak > 0 ? ` · 🔥 ${streak} dias` : ''}
-          </p>
-          <h1 className="text-[30px] font-black text-white mt-0.5" style={{ letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+  return (
+    <div className="min-h-screen bg-bg px-5 pt-5 pb-6 max-w-lg mx-auto flex flex-col gap-7">
+
+      {/* Cabeçalho */}
+      <header className="flex justify-between items-center gap-4">
+        <div className="min-w-0">
+          <p className="text-[14px] text-ink-muted">{formatarDataCurta()}</p>
+          <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink truncate">
             Olá, {primeiroNome(aluno?.nome)}
           </h1>
         </div>
         <button
           onClick={() => navigate('/perfil')}
-          className="w-11 h-11 rounded-full border-none cursor-pointer font-black text-black text-sm shrink-0"
-          style={{ background: 'linear-gradient(135deg, #00FF7F, #00BFFF)' }}
+          className="w-12 h-12 shrink-0 rounded-full bg-surface-2 border border-line text-ink text-[15px] font-bold"
           aria-label="Ver perfil"
         >
           {iniciais(aluno?.nome)}
         </button>
-      </div>
+      </header>
 
       <BannerAvisos aluno={aluno} />
 
-      {/* Card Principal */}
-      <div className="px-5 mt-4">
-        <div className="bg-card rounded-3xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.09)' }}>
-          {/* Topo com gradiente verde */}
-          <div
-            className="px-5 pt-5 pb-4"
-            style={{
-              background: 'linear-gradient(135deg, rgba(0,255,127,0.13) 0%, rgba(0,255,127,0.03) 100%)',
-              borderBottom: '1px solid rgba(0,255,127,0.1)',
-            }}
-          >
-            <span
-              className="inline-block text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
-              style={{ background: 'rgba(0,255,127,0.1)', color: '#00FF7F', border: '1px solid rgba(0,255,127,0.2)', letterSpacing: '0.06em' }}
-            >
-              {card.badge}
-            </span>
-            <h2 className="text-[26px] font-black text-white mt-3" style={{ letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-              {card.nomeTreino}
-            </h2>
-            {card.subtitulo && (
-              <p className="text-[13px] font-medium text-ios-text-secondary mt-1.5">
-                {card.subtitulo}
-              </p>
-            )}
-          </div>
+      {/* Treino de hoje: a única ação principal da tela */}
+      <section className="rounded-2xl bg-surface border border-line p-5" aria-labelledby="treino-hoje">
+        <p className={`flex items-center gap-1.5 text-[14px] font-semibold ${sessaoHoje ? 'text-primary' : 'text-ink-muted'}`}>
+          {sessaoHoje && <CheckIcon />}
+          {card.badge}
+        </p>
+        <h2 id="treino-hoje" className="mt-2 text-[30px] leading-[1.1] font-black tracking-[-0.02em] text-ink text-balance">
+          {card.nomeTreino}
+        </h2>
+        {card.subtitulo && <p className="mt-2 text-[15px] text-ink-muted">{card.subtitulo}</p>}
 
-          {/* Stats */}
-          {planoAtivo && (
-            <div className="flex" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex-1 px-5 py-3" style={{ borderRight: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] font-bold text-ios-text-secondary uppercase" style={{ letterSpacing: '0.07em' }}>Treinos</p>
-                <p className="text-xl font-black text-white mt-0.5">{planoAtivo.treinos?.length ?? 0}</p>
-              </div>
-              <div className="flex-1 px-5 py-3" style={{ borderRight: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-[10px] font-bold text-ios-text-secondary uppercase" style={{ letterSpacing: '0.07em' }}>Exercícios</p>
-                <p className="text-xl font-black text-white mt-0.5">{totalEx}</p>
-              </div>
-              <div className="flex-1 px-5 py-3">
-                <p className="text-[10px] font-bold text-ios-text-secondary uppercase" style={{ letterSpacing: '0.07em' }}>Saldo</p>
-                <p className="text-xl font-black text-white mt-0.5">{aluno?.saldo_aulas ?? '—'}</p>
-              </div>
-            </div>
-          )}
-
-          {/* CTA */}
-          <div className="px-5 py-4">
-            <Link
-              to={card.desabilitado ? '#' : card.destino}
-              onClick={card.desabilitado ? (event) => event.preventDefault() : undefined}
-              aria-disabled={card.desabilitado}
-              aria-busy={card.desabilitado}
-              tabIndex={card.desabilitado ? -1 : undefined}
-              className={`press flex items-center justify-center gap-2 w-full font-black text-black rounded-2xl ${card.desabilitado ? 'opacity-60 pointer-events-none' : ''}`}
-              style={{
-                padding: '17px',
-                fontSize: 16,
-                background: '#00FF7F',
-                boxShadow: '0 0 24px rgba(0,255,127,0.25)',
-                letterSpacing: '-0.01em',
-              }}
-            >
-              <DumbbellIcon color="#000" size={18} />
-              {card.cta}
-            </Link>
-          </div>
+        <div className="mt-5">
+          <Button
+            variant="primary"
+            size="lg"
+            width="100%"
+            className="min-h-14 text-[17px] font-bold"
+            label={card.cta}
+            icon={<DumbbellIcon />}
+            href={card.destino}
+            isDisabled={card.desabilitado}
+          />
         </div>
-      </div>
 
-      {/* Tracker semanal */}
-      <div className="px-5 mt-6">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-[15px] font-bold text-white">Últimos 7 dias</h3>
-          <span className="text-[13px] font-medium text-ios-text-secondary">
-            {ultimos7.filter(d => d.done).length} / 7
-          </span>
-        </div>
-        <div className="flex justify-between">
-          {ultimos7.map((d, i) => (
-            <div key={i} className="flex flex-col items-center gap-1.5">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-bold"
-                style={{
-                  background: d.done ? '#00FF7F' : d.isToday ? 'rgba(0,255,127,0.1)' : 'transparent',
-                  border: d.isToday && !d.done ? '2px solid #00FF7F' : d.done ? 'none' : '2px solid #444',
-                  color: d.done ? '#000' : d.isToday ? '#00FF7F' : '#555',
-                }}
-              >
-                {d.done ? (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M2.5 7l3 3L11.5 4" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                ) : d.label.charAt(0)}
+        {planoAtivo && (
+          <dl className="mt-5 pt-4 border-t border-line grid grid-cols-3 gap-3">
+            {[
+              ['Treinos', planoAtivo.treinos?.length ?? 0],
+              ['Exercícios', totalEx],
+              ['Saldo de aulas', aluno?.saldo_aulas ?? '—'],
+            ].map(([rotulo, valor]) => (
+              <div key={rotulo}>
+                <dt className="text-[13px] text-ink-muted">{rotulo}</dt>
+                <dd className="num text-[22px] font-bold text-ink">{valor}</dd>
               </div>
-              <span className="text-[11px] font-medium" style={{ color: d.isToday ? '#00FF7F' : '#555' }}>
-                {d.label}
+            ))}
+          </dl>
+        )}
+      </section>
+
+      {/* Frequência */}
+      <section aria-labelledby="ultimos-7">
+        <div className="flex justify-between items-baseline mb-4">
+          <h3 id="ultimos-7" className="text-[18px] font-bold text-ink">Últimos 7 dias</h3>
+          <p className="flex items-center gap-3 text-[14px] text-ink-muted">
+            {streak > 0 && (
+              <span className="flex items-center gap-1 text-alert font-semibold">
+                <FlameIcon /> {streak} {streak === 1 ? 'dia seguido' : 'dias seguidos'}
               </span>
-            </div>
-          ))}
+            )}
+            <span className="num">{diasFeitos} de 7</span>
+          </p>
         </div>
+        <ol className="flex justify-between">
+          {ultimos7.map((d, i) => (
+            <li
+              key={i}
+              className="flex flex-col items-center gap-1.5"
+              aria-label={`${d.label}: ${d.done ? 'treinou' : 'sem treino'}${d.isToday ? ' (hoje)' : ''}`}
+            >
+              <span
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold ${
+                  d.done
+                    ? 'bg-primary text-on-primary'
+                    : d.isToday
+                      ? 'border-2 border-primary text-primary'
+                      : 'border-2 border-line text-ink-dim'
+                }`}
+              >
+                {d.done ? <CheckIcon /> : d.label.charAt(0)}
+              </span>
+              <span className={`text-[12px] font-medium ${d.isToday ? 'text-ink' : 'text-ink-dim'}`}>{d.label}</span>
+            </li>
+          ))}
+        </ol>
 
         {semana?.treinos?.length > 0 && (
-          <div className="mt-5">
-            <h3 className="text-[15px] font-bold text-white mb-2">Esta Semana</h3>
-            <div
-              className="flex flex-wrap gap-2"
-              role="list"
-              aria-label="Progresso semanal por treino"
-            >
+          <div className="mt-6">
+            <h3 className="text-[15px] font-semibold text-ink-muted mb-2">Esta semana</h3>
+            <div className="flex flex-wrap gap-2" role="list" aria-label="Progresso semanal por treino">
               {semana.treinos.map((treino) => {
                 const completo = treino.feitas >= treino.vezes_por_semana;
                 const label = `${treino.treino_nome}: ${treino.feitas} de ${treino.vezes_por_semana} sessões`;
@@ -211,73 +166,59 @@ export default function Dashboard() {
                     role="listitem"
                     aria-label={label}
                     title={label}
-                    className="px-3 py-1.5 rounded-xl text-[12px] font-bold max-w-full truncate"
-                    style={{
-                      background: completo ? 'rgba(0,255,127,0.12)' : 'rgba(255,255,255,0.06)',
-                      color: completo ? '#00FF7F' : '#888',
-                      border: `1px solid ${completo ? 'rgba(0,255,127,0.25)' : 'rgba(255,255,255,0.08)'}`,
-                    }}
+                    className={`flex items-center gap-1.5 max-w-full px-3 py-2 rounded-full text-[14px] font-semibold border ${
+                      completo ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-surface border-line text-ink-muted'
+                    }`}
                   >
-                    {treino.treino_nome} {treino.feitas}/{treino.vezes_por_semana}
+                    {completo && <CheckIcon size={14} />}
+                    <span className="truncate">{treino.treino_nome}</span>
+                    <span className="num shrink-0">{treino.feitas}/{treino.vezes_por_semana}</span>
                   </span>
                 );
               })}
             </div>
           </div>
         )}
-      </div>
+      </section>
+
+      {/* Aviso de meta */}
+      {faltam > 0 && faltam <= 3 && metaMes > 0 && (
+        <p className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-primary/10 border border-primary/25 text-primary text-[15px] font-semibold">
+          <TargetIcon />
+          {faltam === 1 ? 'Falta 1 treino' : `Faltam ${faltam} treinos`} para bater a meta do mês.
+        </p>
+      )}
 
       {/* Últimas sessões */}
       {recentes.length > 0 && (
-        <div className="px-5 mt-6">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-[15px] font-bold text-white">Últimas Sessões</h3>
-            <Link to="/historico" className="text-[13px] font-medium text-ios-text-secondary">
+        <section aria-labelledby="ultimas-sessoes">
+          <div className="flex justify-between items-center">
+            <h3 id="ultimas-sessoes" className="text-[18px] font-bold text-ink">Últimas sessões</h3>
+            <Link to="/historico" className="press -mr-2 px-2 min-h-11 flex items-center text-[15px] font-semibold text-primary">
               Ver todas
             </Link>
           </div>
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <ul className="divide-y divide-line border-y border-line">
             {recentes.map(s => {
               const d      = new Date(s.data_hora);
               const semana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
               const meses  = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
               return (
-                <div
-                  key={s.id}
-                  className="flex justify-between items-center py-3"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-                >
-                  <div>
-                    <p className="text-[14px] font-bold text-white">
+                <li key={s.id} className="flex justify-between items-center gap-3 py-3.5">
+                  <div className="min-w-0">
+                    <p className="text-[16px] font-semibold text-ink truncate">
                       {s.plano_treino?.titulo ?? 'Sessão Presencial'}
                     </p>
-                    <p className="text-xs text-ios-text-secondary mt-0.5">
+                    <p className="text-[14px] text-ink-muted mt-0.5">
                       {semana[d.getDay()]} · {d.getDate()} de {meses[d.getMonth()]}
                     </p>
                   </div>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 3.5l3 3L8.5 2.5" stroke="#00FF7F" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
+                  <span className="text-primary shrink-0"><CheckIcon /></span>
+                </li>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* Aviso de meta */}
-      {faltam > 0 && faltam <= 3 && metaMes > 0 && (
-        <div className="mx-5 mt-4">
-          <div
-            className="flex items-center gap-2 px-4 py-3 rounded-2xl"
-            style={{ background: 'rgba(0,255,127,0.08)', border: '1px solid rgba(0,255,127,0.15)' }}
-          >
-            <span>🎯</span>
-            <p className="text-[13px] font-bold" style={{ color: '#00FF7F' }}>
-              Faltam {faltam} treinos para bater a meta mensal!
-            </p>
-          </div>
-        </div>
+          </ul>
+        </section>
       )}
     </div>
   );

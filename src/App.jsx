@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { BottomNav } from './components/BottomNav';
+import { PageLoader } from './components/PageLoader';
 import Login from './pages/Login';
 import { BloqueioConsultoria } from './components/BloqueioConsultoria';
 
@@ -16,25 +17,17 @@ function ProtectedLayout({ children }) {
   const { pathname }      = useLocation();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-ios-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) return <Navigate to="/login" replace />;
   if (aluno?.acesso_bloqueado) return <BloqueioConsultoria />;
 
   return (
-    <div className="pb-20">
-      <Suspense fallback={
-        <div className="flex items-center justify-center min-h-screen bg-ios-background">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      }>
+    <div className="pb-[calc(4rem+env(safe-area-inset-bottom))]">
+      <Suspense fallback={<PageLoader />}>
         {/* key no pathname reinicia a animação a cada navegação — transição única e consistente */}
-        <main key={pathname} style={{ animation: 'pageIn 0.3s var(--ease-out-quint)' }}>
+        <main key={pathname} className="animate-[pageIn_0.3s_var(--ease-out-quint)]">
           {children}
         </main>
       </Suspense>

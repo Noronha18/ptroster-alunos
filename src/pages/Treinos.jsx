@@ -2,122 +2,125 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAluno } from '../hooks/useAluno';
 import { useToast } from '../hooks/useToast';
+import { Button } from '@astryxdesign/core/Button';
 import { Toast } from '../components/Toast';
+import { PageLoader } from '../components/PageLoader';
+import { CheckIcon } from '../components/icons';
 import api from '../services/api';
 import { getAlunoId } from '../utils/auth';
 import { chaveSerie, seriesParaEnvio, valoresIniciais } from '../utils/series';
 import { indiceTreinoDaUrl } from '../utils/treino';
 
 /* ─── RestTimer ─────────────────────────────────────── */
+// Fica preso acima da navegação: sempre visível e ao alcance do polegar,
+// com os segundos grandes o bastante para ler com o celular no chão.
 function RestTimer({ seconds, total, onSkip }) {
   const pct    = total > 0 ? seconds / total : 0;
-  const R      = 18;
-  const circ   = 2 * Math.PI * R;
   const urgent = seconds <= 10;
 
   return (
-    <div
-      className="flex items-center gap-3 p-3 rounded-2xl mb-3"
-      style={{
-        background: urgent ? 'rgba(255,107,53,0.12)' : 'rgba(0,255,127,0.08)',
-        border: `1px solid ${urgent ? 'rgba(255,107,53,0.4)' : 'rgba(0,255,127,0.2)'}`,
-        animation: urgent ? 'timerPulse 0.8s ease-in-out infinite' : 'slideUp 0.2s ease',
-      }}
-    >
-      <div className="relative w-11 h-11 shrink-0">
-        <svg width="44" height="44" viewBox="0 0 44 44">
-          <circle cx="22" cy="22" r={R} fill="none" stroke="#222" strokeWidth="3" />
-          <circle
-            cx="22" cy="22" r={R} fill="none"
-            stroke={urgent ? '#FF6B35' : '#00FF7F'}
-            strokeWidth="3"
-            strokeDasharray={circ}
-            strokeDashoffset={circ * (1 - pct)}
-            strokeLinecap="round"
-            transform="rotate(-90 22 22)"
-            style={{ transition: 'stroke-dashoffset 1s linear' }}
-          />
-        </svg>
-        <span
-          className="absolute inset-0 flex items-center justify-center text-[13px] font-bold tabular-nums"
-          style={{ color: urgent ? '#FF6B35' : '#00FF7F' }}
-        >
-          {seconds}
-        </span>
-      </div>
-      <div className="flex-1">
-        <p className="text-sm font-bold text-white">Descanso</p>
-        <p className="text-xs text-ios-text-secondary">{urgent ? 'Prepare-se!' : 'Próxima série em breve'}</p>
-      </div>
-      <button
-        onClick={onSkip}
-        className="px-3 py-1.5 rounded-lg text-xs font-bold text-ios-text-secondary"
-        style={{ background: '#222', border: '1px solid #333' }}
-        aria-label="Pular descanso"
+    <div className="fixed inset-x-0 z-30 px-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] animate-[slideUp_0.2s_ease]">
+      <div
+        role="timer"
+        aria-label={`Descanso: ${seconds} segundos`}
+        className={`max-w-lg mx-auto overflow-hidden rounded-2xl border shadow-[0_12px_32px_rgb(0_0_0/0.5)] ${
+          urgent ? 'bg-alert border-alert text-on-primary' : 'bg-surface-2 border-line text-ink'
+        }`}
       >
-        Pular
-      </button>
+        <div className="flex items-center gap-4 pl-5 pr-3 py-3">
+          <span className={`num text-[40px] leading-none font-black min-w-[2ch] ${urgent ? '' : 'text-alert'}`}>
+            {seconds}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[17px] font-bold text-inherit">Descanso</p>
+            <p className={`text-[14px] ${urgent ? 'text-inherit' : 'text-ink-muted'}`}>
+              {urgent ? 'Prepare-se!' : 'segundos para a próxima série'}
+            </p>
+          </div>
+          <button
+            onClick={onSkip}
+            className={`min-h-12 px-5 rounded-xl text-[15px] font-bold text-inherit border ${
+              urgent ? 'border-on-primary/40' : 'bg-surface border-line'
+            }`}
+          >
+            Pular
+          </button>
+        </div>
+        <div className={`h-1 ${urgent ? 'bg-on-primary/20' : 'bg-line'}`}>
+          <div
+            className={`h-full origin-left transition-transform duration-1000 ease-linear ${urgent ? 'bg-on-primary' : 'bg-alert'}`}
+            style={{ transform: `scaleX(${pct})` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ─── CompletionModal ────────────────────────────────── */
-function CompletionModal({ onSalvar, salvando, onClose, totalSets, treinoNome }) {
-  const COLORS = ['#00FF7F', '#FFD700', '#FF6B35', '#00BFFF', '#FF453A'];
+const CONFETE = ['bg-primary', 'bg-alert', 'bg-ink', 'bg-info'];
+
+// <dialog> nativo: prende o foco, fecha com Esc e cobre a tela sem biblioteca.
+function CompletionModal({ onSalvar, salvando, onClose, feitas, totalSets, treinoNome, children }) {
+  const ref      = useRef(null);
+  const completo = feitas === totalSets;
+
+  useEffect(() => {
+    ref.current?.showModal?.();
+  }, []);
 
   return (
-    <div
-      className="absolute inset-0 flex items-center justify-center px-6"
-      style={{ background: 'rgba(0,0,0,0.88)', zIndex: 200, animation: 'fadeIn 0.2s ease' }}
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      aria-labelledby="resumo-titulo"
+      className="m-auto w-[calc(100%-2.5rem)] max-w-sm overflow-visible rounded-2xl bg-surface border border-line p-6 text-center text-ink backdrop:bg-black/85 animate-[pop_0.35s_var(--ease-out-quint)]"
     >
-      {Array.from({ length: 14 }, (_, i) => (
-        <div
+      {completo && Array.from({ length: 14 }, (_, i) => (
+        <span
           key={i}
-          className="absolute pointer-events-none"
+          aria-hidden="true"
+          className={`absolute -top-2 pointer-events-none ${CONFETE[i % CONFETE.length]} ${i % 3 === 0 ? 'rounded-full' : 'rounded-[2px]'} ${i % 2 === 0 ? 'w-2 h-2' : 'w-1.5 h-1.5'}`}
           style={{
-            left: `${10 + (i / 14) * 80}%`,
-            top: `${20 + (i % 3) * 15}%`,
-            width: i % 2 === 0 ? 8 : 5,
-            height: i % 2 === 0 ? 8 : 5,
-            background: COLORS[i % COLORS.length],
-            borderRadius: i % 3 === 0 ? '50%' : 2,
+            left: `${6 + (i / 14) * 88}%`,
             animation: `confetti ${0.6 + (i % 3) * 0.2}s ease-out ${i * 0.05}s forwards`,
           }}
         />
       ))}
-      <div
-        className="bg-card rounded-3xl p-7 w-full max-w-xs text-center"
-        style={{ border: '1px solid rgba(255,255,255,0.1)', animation: 'pop 0.35s cubic-bezier(0.16,1,0.3,1)' }}
-      >
-        <div className="text-5xl mb-3">🎉</div>
-        <h2 className="text-2xl font-black text-white mb-1">Treino Concluído!</h2>
-        <p className="text-sm text-ios-text-secondary mb-5">Excelente performance!</p>
-        <div className="grid grid-cols-2 gap-2 mb-5">
-          <div className="bg-card2 rounded-2xl p-3">
-            <p className="text-lg font-black text-primary">{totalSets}</p>
-            <p className="text-[11px] text-ios-text-secondary mt-0.5">Séries</p>
-          </div>
-          <div className="bg-card2 rounded-2xl p-3">
-            <p className="text-sm font-black text-primary truncate">{treinoNome}</p>
-            <p className="text-[11px] text-ios-text-secondary mt-0.5">Treino</p>
-          </div>
-        </div>
-        <button
+
+      <span className="mx-auto flex w-16 h-16 items-center justify-center rounded-full bg-primary text-on-primary">
+        <CheckIcon size={32} />
+      </span>
+      <h2 id="resumo-titulo" className="mt-4 text-[26px] leading-tight font-black tracking-[-0.02em]">
+        {completo ? 'Treino concluído!' : 'Finalizar treino?'}
+      </h2>
+      <p className="mt-1 text-[16px] text-ink-muted">{treinoNome}</p>
+      <p className="mt-4 text-[16px]">
+        <span className="num text-[32px] font-black text-primary">{feitas}</span>
+        <span className="text-ink-muted"> de {totalSets} séries feitas</span>
+      </p>
+
+      <div className="mt-6 flex flex-col gap-3">
+        <Button
+          variant="primary"
+          size="lg"
+          width="100%"
+          className="min-h-14 text-[17px] font-bold"
+          label="Salvar treino"
           onClick={onSalvar}
-          disabled={salvando}
-          className="w-full py-3.5 bg-primary text-black font-black rounded-2xl text-sm mb-2 disabled:opacity-60"
-        >
-          {salvando ? 'Salvando…' : 'Salvar treino ✓'}
-        </button>
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 font-bold text-sm rounded-2xl"
-          style={{ background: 'none', border: '1px solid rgba(255,255,255,0.1)', color: '#888' }}
-        >
-          Fechar
-        </button>
+          isLoading={salvando}
+        />
+        <Button
+          variant="secondary"
+          size="lg"
+          width="100%"
+          className="min-h-12 text-[16px]"
+          label="Voltar ao treino"
+          onClick={() => ref.current?.close()}
+        />
       </div>
-    </div>
+      {children}
+    </dialog>
   );
 }
 
@@ -132,26 +135,19 @@ function VideoExercicio({ url }) {
 
   if (ytId) {
     return (
-      <div style={{ position: 'relative', paddingBottom: '56.25%', borderRadius: 10, overflow: 'hidden' }}>
+      <div className="relative aspect-video overflow-hidden rounded-xl">
         <iframe
           src={`https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1`}
           title="Execução do exercício"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+          className="absolute inset-0 w-full h-full border-0"
         />
       </div>
     );
   }
 
-  return (
-    <video
-      src={url}
-      controls
-      playsInline
-      style={{ width: '100%', borderRadius: 10, maxHeight: 220, background: '#000' }}
-    />
-  );
+  return <video src={url} controls playsInline className="w-full max-h-56 rounded-xl bg-black" />;
 }
 
 const SET_GROUPS = {
@@ -226,212 +222,150 @@ function SetGroup({ type, children, itemCount }) {
 
   return (
     <section
-      className="mb-3 overflow-hidden"
-      style={{
-        border: '1px solid rgba(0,255,127,0.32)',
-        borderRadius: 14,
-        background: 'rgba(0,255,127,0.035)',
-      }}
+      className="rounded-2xl border border-primary/30 bg-primary/5 p-2 flex flex-col gap-2"
       aria-label={`${label} com ${itemCount} exercícios em sequência`}
     >
-      <div
-        className="flex items-center justify-between gap-3 px-4 py-3"
-        style={{ borderBottom: '1px solid rgba(0,255,127,0.18)' }}
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-            style={{ background: '#00FF7F', color: '#07130D' }}
-            aria-hidden="true"
-          >
-            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+      <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 17 17" fill="none">
               <path d="M3 5.5h7.5M8.5 3.5l2 2-2 2M14 11.5H6.5M8.5 9.5l-2 2 2 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
           <div className="min-w-0">
-            <h2 className="text-sm font-black text-primary">{label}</h2>
-            <p className="text-xs text-white">Faça em sequência · descanse ao final</p>
+            <h2 className="text-[16px] font-bold text-primary">{label}</h2>
+            <p className="text-[14px] text-ink-muted">Faça em sequência, descanse ao final</p>
           </div>
         </div>
-        <span className="shrink-0 text-xs font-black tabular-nums" style={{ color: '#9CA3AF' }}>
-          {sequence}
-        </span>
+        <span className="num shrink-0 text-[14px] font-bold text-ink-muted">{sequence}</span>
       </div>
-      <div className="px-2 pt-2">{children}</div>
+      {children}
     </section>
   );
 }
 
 /* ─── ExercicioAccordion ─────────────────────────────── */
+const GRADE_SERIES = 'grid grid-cols-[2.5rem_1fr_1fr_3.5rem] gap-2';
+// 48px de altura e número grande: dá para acertar o campo com a mão suada.
+const CAMPO_SERIE = 'input-dark num w-full min-w-0 h-12 rounded-xl bg-surface-2 border border-line text-center text-[18px] font-bold outline-none placeholder:text-ink-dim [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none';
+
 export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets, onToggle, isOpen, onOpen, valores, onValor }) {
   const sets    = useMemo(() => Array.from({ length: prescricao.series || 0 }, (_, i) => i + 1), [prescricao.series]);
   const doneCnt = sets.filter(n => doneSets[chaveSerie(prescricao.id, n)]).length;
   const allDone = doneCnt === sets.length && sets.length > 0;
 
-  const cargaPrescrita = prescricao.carga_kg || prescricao.carga || '';
+  const cargaBruta = prescricao.carga_kg || prescricao.carga || '';
+  // Carga só com número ganha a unidade; texto livre do personal ("60kg", "leve") fica como veio.
+  const cargaPrescrita = /^\d+([.,]\d+)?$/.test(String(cargaBruta)) ? `${cargaBruta} kg` : cargaBruta;
+
+  const descanso = prescricao.tempo_descanso_segundos ?? prescricao.descanso;
 
   return (
-    <div className="mb-2">
+    <div className={`overflow-hidden rounded-2xl border transition-colors ${allDone ? 'bg-primary/5 border-primary/30' : 'bg-surface border-line'}`}>
       <button
         onClick={onOpen}
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
-        style={{
-          background: allDone ? 'rgba(0,255,127,0.08)' : isOpen ? 'rgba(255,255,255,0.04)' : '#1A1A1A',
-          borderRadius: isOpen ? '14px 14px 0 0' : 14,
-          border: `1px solid ${allDone ? 'rgba(0,255,127,0.25)' : isOpen ? 'rgba(255,255,255,0.1)' : '#2A2A2A'}`,
-          borderBottom: isOpen ? '1px solid rgba(255,255,255,0.05)' : undefined,
-          transition: 'background 0.15s',
-        }}
+        className="w-full min-h-16 flex items-center gap-3 px-4 py-3 text-left"
         aria-expanded={isOpen}
       >
-        <div
-          className="w-9 h-9 flex items-center justify-center text-[13px] font-bold shrink-0"
-          style={{
-            borderRadius: 10,
-            background: allDone ? 'rgba(0,255,127,0.1)' : '#222',
-            border: `1px solid ${allDone ? 'rgba(0,255,127,0.3)' : '#333'}`,
-            color: allDone ? '#00FF7F' : '#888',
-            animation: allDone ? 'checkReveal 0.24s var(--ease-out-quint)' : 'none',
-          }}
+        <span
+          className={`num w-10 h-10 flex items-center justify-center rounded-xl text-[15px] font-bold shrink-0 ${
+            allDone ? 'bg-primary text-on-primary animate-[checkReveal_0.24s_var(--ease-out-quint)]' : 'bg-surface-2 text-ink-muted'
+          }`}
         >
-          {allDone ? (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2.5 7l3 3L11.5 4" stroke="#00FF7F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          ) : groupPosition ?? numero}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-bold text-white truncate">
+          {allDone ? <CheckIcon /> : groupPosition ?? numero}
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[17px] leading-snug font-bold text-ink line-clamp-2">
             {prescricao.nome_exercicio ?? `Exercício ${prescricao.exercicio_id}`}
-          </p>
-          <p className="text-xs text-ios-text-secondary mt-0.5">
+          </span>
+          <span className="num block text-[14px] text-ink-muted mt-0.5">
             {prescricao.series}×{prescricao.repeticoes}
             {cargaPrescrita ? ` · ${cargaPrescrita}` : ''}
-            {(prescricao.tempo_descanso_segundos ?? prescricao.descanso)
-              ? ` · ${prescricao.tempo_descanso_segundos ?? prescricao.descanso}s`
-              : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-bold" style={{ color: allDone ? '#00FF7F' : '#888' }}>
-            {doneCnt}/{sets.length}
+            {descanso ? ` · ${descanso}s` : ''}
           </span>
-          <svg
-            width="14" height="14" viewBox="0 0 14 14" fill="none"
-            style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-          >
-            <path d="M3 5l4 4 4-4" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
+        </span>
+        <span className={`num text-[15px] font-bold shrink-0 ${allDone ? 'text-primary' : 'text-ink-muted'}`}>
+          {doneCnt}/{sets.length}
+        </span>
+        <svg
+          width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"
+          className={`shrink-0 text-ink-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        >
+          <path d="M3 5l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </button>
 
       {/* Expansão animada via grid-template-rows (0fr → 1fr) — sem animar height. */}
       <div
-        style={{
-          display: 'grid',
-          gridTemplateRows: isOpen ? '1fr' : '0fr',
-          opacity: isOpen ? 1 : 0,
-          transition: 'grid-template-rows 0.3s var(--ease-out-quint), opacity 0.25s ease',
-        }}
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[var(--ease-out-quint)] ${
+          isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
         inert={!isOpen}
       >
-        <div style={{ overflow: 'hidden', minHeight: 0 }}>
-        <div style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none', borderRadius: '0 0 14px 14px' }}>
-          {/* Vídeo de execução — montado só quando aberto (evita carregar iframes ocultos) */}
-          {isOpen && prescricao.exercicio?.video_url && (
-            <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[11px] font-bold uppercase mb-2" style={{ color: '#555', letterSpacing: '0.05em' }}>
-                Execução
-              </p>
-              <VideoExercicio url={prescricao.exercicio.video_url} />
+        <div className="overflow-hidden min-h-0">
+          <div className="border-t border-line">
+            {/* Vídeo de execução — montado só quando aberto (evita carregar iframes ocultos) */}
+            {isOpen && prescricao.exercicio?.video_url && (
+              <div className="px-4 py-3 border-b border-line">
+                <p className="text-[13px] font-semibold text-ink-muted mb-2">Execução</p>
+                <VideoExercicio url={prescricao.exercicio.video_url} />
+              </div>
+            )}
+
+            {/* Cabeçalho das séries */}
+            <div className={`${GRADE_SERIES} px-4 pt-3 pb-1 text-[13px] font-semibold text-ink-muted`} aria-hidden="true">
+              <span>Série</span>
+              <span className="text-center">Reps</span>
+              <span className="text-center">Kg</span>
+              <span className="text-center">Feito</span>
             </div>
-          )}
-          {/* Cabeçalho das séries */}
-          <div
-            className="grid px-4 py-2"
-            style={{ gridTemplateColumns: '28px 1fr 1fr 48px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-          >
-            {['#', 'Reps', 'Kg', '✓'].map((h, i) => (
-              <span
-                key={i}
-                className="text-[11px] font-bold uppercase"
-                style={{ color: '#555', letterSpacing: '0.05em', textAlign: i === 0 ? 'left' : 'center' }}
-              >
-                {h}
-              </span>
-            ))}
-          </div>
-          {/* Linhas de série */}
-          {sets.map(n => {
-            const key  = chaveSerie(prescricao.id, n);
-            const done = !!doneSets[key];
-            return (
-              <div
-                key={n}
-                className="grid px-4 py-3 items-center"
-                style={{
-                  gridTemplateColumns: '28px 1fr 1fr 48px',
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  background: done ? 'rgba(0,255,127,0.04)' : 'transparent',
-                  transition: 'background 0.2s',
-                }}
-              >
-                <span className="text-[13px] font-bold" style={{ color: done ? '#00FF7F' : '#888' }}>{n}</span>
-                <input
-                  type="number" inputMode="numeric" min="0"
-                  aria-label={`Série ${n}, repetições`}
-                  placeholder={prescricao.repeticoes || '—'}
-                  value={valores?.[key]?.reps ?? ''}
-                  onChange={e => onValor(key, 'reps', e.target.value)}
-                  className="input-dark mx-2 px-2 py-2 text-[15px] font-bold text-center rounded-xl"
-                  style={{ background: '#222', border: '1.5px solid #333', color: done ? '#00FF7F' : '#fff', outline: 'none', minWidth: 0 }}
-                />
-                <input
-                  type="number" inputMode="decimal" min="0" step="0.5"
-                  aria-label={`Série ${n}, carga em kg`}
-                  placeholder="kg"
-                  value={valores?.[key]?.kg ?? ''}
-                  onChange={e => onValor(key, 'kg', e.target.value)}
-                  className="input-dark mx-2 px-2 py-2 text-[15px] font-bold text-center rounded-xl"
-                  style={{ background: '#222', border: '1.5px solid #333', color: done ? '#00FF7F' : '#fff', outline: 'none', minWidth: 0 }}
-                />
-                <div className="flex justify-center">
+
+            {/* Linhas de série */}
+            {sets.map(n => {
+              const key  = chaveSerie(prescricao.id, n);
+              const done = !!doneSets[key];
+              const campo = `${CAMPO_SERIE} ${done ? 'text-primary' : 'text-ink'}`;
+              return (
+                <div key={n} className={`${GRADE_SERIES} px-4 py-2 items-center transition-colors ${done ? 'bg-primary/5' : ''}`}>
+                  <span className={`num text-[17px] font-bold ${done ? 'text-primary' : 'text-ink-muted'}`}>{n}</span>
+                  <input
+                    type="number" inputMode="numeric" min="0"
+                    aria-label={`Série ${n}, repetições`}
+                    placeholder={prescricao.repeticoes || '—'}
+                    value={valores?.[key]?.reps ?? ''}
+                    onChange={e => onValor(key, 'reps', e.target.value)}
+                    className={campo}
+                  />
+                  <input
+                    type="number" inputMode="decimal" min="0" step="0.5"
+                    aria-label={`Série ${n}, carga em kg`}
+                    placeholder="kg"
+                    value={valores?.[key]?.kg ?? ''}
+                    onChange={e => onValor(key, 'kg', e.target.value)}
+                    className={campo}
+                  />
                   <button
-                    onClick={() => onToggle(prescricao.id, n, prescricao.tempo_descanso_segundos ?? prescricao.descanso ?? 60)}
+                    onClick={() => onToggle(prescricao.id, n, descanso ?? 60)}
                     aria-pressed={done}
-                    className="w-11 h-11 flex items-center justify-center"
-                    style={{
-                      borderRadius: 10,
-                      background: done ? '#00FF7F' : '#222',
-                      border: `1.5px solid ${done ? '#00FF7F' : '#555'}`,
-                      transition: 'all 0.15s',
-                    }}
+                    aria-label={`Série ${n} feita`}
+                    className={`w-12 h-12 justify-self-center flex items-center justify-center rounded-xl border-2 transition-colors ${
+                      done ? 'bg-primary border-primary text-on-primary' : 'border-ink-dim text-transparent'
+                    }`}
                   >
-                    {done && (
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M2.5 7l3 3L11.5 4" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
+                    <CheckIcon size={20} />
                   </button>
                 </div>
+              );
+            })}
+
+            {/* Observações do personal */}
+            {prescricao.observacoes && (
+              <div className="px-4 py-3 mt-1 border-t border-line">
+                <p className="text-[13px] font-semibold text-ink-muted mb-1">Nota do personal</p>
+                <p className="text-[15px] leading-relaxed text-ink">{prescricao.observacoes}</p>
               </div>
-            );
-          })}
-          {/* Observações do personal */}
-          {prescricao.observacoes && (
-            <div
-              className="px-4 py-3"
-              style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
-            >
-              <p className="text-[11px] font-bold uppercase" style={{ color: '#555', letterSpacing: '0.05em', marginBottom: 4 }}>
-                Nota do Personal
-              </p>
-              <p className="text-[13px]" style={{ color: '#aaa', lineHeight: 1.5 }}>
-                {prescricao.observacoes}
-              </p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -504,7 +438,7 @@ export default function Treinos() {
 
   const doneCnt      = Object.values(doneSets).filter(Boolean).length;
   const pct          = totalSets > 0 ? Math.round((doneCnt / totalSets) * 100) : 0;
-  const milestoneMsg = pct >= 75 ? '💪 Quase lá!' : pct >= 50 ? '⚡ Metade, ótimo ritmo!' : pct >= 25 ? '🔥 Aquecido!' : null;
+  const milestoneMsg = pct >= 100 ? null : pct >= 75 ? 'Quase lá!' : pct >= 50 ? 'Metade, ótimo ritmo!' : pct >= 25 ? 'Aquecido!' : null;
 
   useEffect(() => {
     setOpenPrescId(selectedTreino?.prescricoes?.[0]?.id ?? null);
@@ -590,55 +524,52 @@ export default function Treinos() {
     });
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-ios-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-ios-background px-6">
-        <p className="text-danger text-center font-bold">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-bg px-6">
+        <p role="alert" className="text-danger text-center text-[17px] font-semibold">{error}</p>
       </div>
     );
   }
 
   if (!planoAtivo || !planoAtivo.treinos?.length) {
     return (
-      <div className="min-h-screen bg-ios-background px-4 pt-14 pb-6">
-        <h1 className="text-3xl font-black text-white tracking-tight mb-6">Meus Treinos</h1>
-        <div className="bg-card rounded-2xl border border-ios-border p-8 text-center">
-          <p className="text-ios-text-secondary">Nenhum plano ativo. Fale com seu personal trainer.</p>
-        </div>
+      <div className="min-h-screen bg-bg px-5 pt-5 max-w-lg mx-auto">
+        <h1 className="text-[32px] font-black tracking-[-0.02em] text-ink">Meus treinos</h1>
+        <p className="mt-3 text-[17px] text-ink-muted">
+          Você ainda não tem um plano ativo. Peça ao seu personal trainer para liberar seu treino.
+        </p>
       </div>
     );
   }
 
   const treinos = planoAtivo.treinos;
+  const pularDescanso = () => { clearTimeout(timerRef.current); setRestSecs(null); };
 
   return (
-    <div className="min-h-screen bg-ios-background pb-4 relative">
+    <div className="min-h-screen bg-bg pb-28 max-w-lg mx-auto">
 
-      <Toast toast={toast} />
+      {!showModal && <Toast toast={toast} />}
 
       {showModal && (
         <CompletionModal
+          feitas={doneCnt}
           totalSets={totalSets}
           treinoNome={selectedTreino?.nome ?? 'Treino'}
           onSalvar={salvarTreino}
           salvando={salvando}
           onClose={() => setShowModal(false)}
-        />
+        >
+          {/* O <dialog> cobre a página; o aviso de erro precisa estar dentro dele para aparecer. */}
+          <Toast toast={toast} />
+        </CompletionModal>
       )}
 
-      {/* Header */}
-      <div className="px-5 pt-5 pb-0" style={{ background: 'linear-gradient(180deg, rgba(0,255,127,0.05) 0%, transparent 100%)' }}>
-        {/* Tabs de treinos */}
+      <header className="px-5 pt-5">
         {treinos.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-4 [scrollbar-width:none]" role="group" aria-label="Escolher treino">
             {treinos.map((t, i) => (
               <button
                 key={t.id}
@@ -650,12 +581,10 @@ export default function Treinos() {
                     setSearchParams(proximos, { replace: true });
                   }
                 }}
-                className="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold"
-                style={{
-                  background: indiceAtivo === i ? '#00FF7F' : 'rgba(255,255,255,0.06)',
-                  color: indiceAtivo === i ? '#000' : '#888',
-                  transition: 'all 0.15s',
-                }}
+                aria-pressed={indiceAtivo === i}
+                className={`shrink-0 min-h-11 px-4 rounded-full text-[15px] font-semibold border transition-colors ${
+                  indiceAtivo === i ? 'bg-primary border-primary text-on-primary' : 'bg-surface border-line text-ink-muted'
+                }`}
               >
                 {t.nome || `Treino ${String.fromCharCode(65 + i)}`}
               </button>
@@ -663,25 +592,24 @@ export default function Treinos() {
           </div>
         )}
 
-        <h1 className="text-[26px] font-black text-white mt-1 mb-0.5" style={{ letterSpacing: '-0.02em' }}>
+        <h1 className="text-[30px] leading-[1.1] font-black tracking-[-0.02em] text-ink text-balance">
           {selectedTreino?.nome ?? 'Treino'}
         </h1>
-        <p className="text-[13px] text-ios-text-secondary mb-3">
+        <p className="num mt-1.5 text-[15px] text-ink-muted">
           {selectedTreino?.prescricoes?.length ?? 0} exercícios · {totalSets} séries
         </p>
+      </header>
 
-        {/* Progresso */}
-        <div className="flex justify-between mb-2">
-          <span className="text-[13px] font-medium text-ios-text-secondary">
-            {milestoneMsg || `${doneCnt} / ${totalSets} séries`}
+      {/* Progresso: gruda no topo para continuar visível enquanto a lista rola */}
+      <div className="sticky top-0 z-20 bg-bg px-5 pt-4 pb-3">
+        <div className="flex justify-between items-baseline mb-2">
+          <span className="num text-[15px] text-ink-muted">
+            {doneCnt} de {totalSets} séries{milestoneMsg ? ` · ${milestoneMsg}` : ''}
           </span>
-          <span className="text-sm font-black tabular-nums" style={{ color: pct > 0 ? '#00FF7F' : '#555' }}>
-            {pct}%
-          </span>
+          <span className={`num text-[17px] font-black ${pct > 0 ? 'text-primary' : 'text-ink-dim'}`}>{pct}%</span>
         </div>
         <div
-          className="h-2 rounded-full overflow-hidden mb-3"
-          style={{ background: '#222' }}
+          className="h-2 rounded-full overflow-hidden bg-surface-2"
           role="progressbar"
           aria-valuenow={pct}
           aria-valuemin={0}
@@ -689,42 +617,30 @@ export default function Treinos() {
           aria-label="Progresso do treino"
         >
           <div
-            className="h-full rounded-full"
-            style={{
-              background: '#00FF7F',
-              transform: `scaleX(${pct / 100})`,
-              transformOrigin: 'left',
-              transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
-            }}
+            className="h-full rounded-full bg-primary origin-left transition-transform duration-300 ease-[var(--ease-out-quint)]"
+            style={{ transform: `scaleX(${pct / 100})` }}
           />
         </div>
-
-        {restSecs !== null && (
-          <RestTimer
-            seconds={restSecs}
-            total={restTotal}
-            onSkip={() => { clearTimeout(timerRef.current); setRestSecs(null); }}
-          />
-        )}
       </div>
 
+      {restSecs !== null && <RestTimer seconds={restSecs} total={restTotal} onSkip={pularDescanso} />}
+
       {/* Lista de exercícios */}
-      <div className="px-4 mt-2 pb-4">
+      <div className="px-4 mt-2 flex flex-col gap-3">
         {exerciseBlocks.map((block, blockIndex) => {
           const exercises = block.items.map(({ prescricao: p, index }, groupIndex) => (
-            <div key={p.id} style={{ animation: `slideUp 0.35s var(--ease-out-quint) ${Math.min(index * 40, 240)}ms backwards` }}>
-              <ExercicioAccordion
-                prescricao={p}
-                numero={index + 1}
-                groupPosition={block.type ? String.fromCharCode(65 + groupIndex) : null}
-                doneSets={doneSets}
-                onToggle={toggleSet}
-                isOpen={openPrescId === p.id}
-                onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
-                valores={valores}
-                onValor={mudarValor}
-              />
-            </div>
+            <ExercicioAccordion
+              key={p.id}
+              prescricao={p}
+              numero={index + 1}
+              groupPosition={block.type ? String.fromCharCode(65 + groupIndex) : null}
+              doneSets={doneSets}
+              onToggle={toggleSet}
+              isOpen={openPrescId === p.id}
+              onOpen={() => setOpenPrescId(openPrescId === p.id ? null : p.id)}
+              valores={valores}
+              onValor={mudarValor}
+            />
           ));
 
           return block.type ? (
@@ -735,18 +651,16 @@ export default function Treinos() {
         })}
 
         {pct > 0 && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="w-full py-4 mt-2 rounded-2xl text-[15px] font-bold"
-            style={{
-              background: pct === 100 ? '#00FF7F' : '#1A1A1A',
-              border: `1px solid ${pct === 100 ? '#00FF7F' : '#2A2A2A'}`,
-              color: pct === 100 ? '#000' : '#888',
-              transition: 'all 0.2s',
-            }}
-          >
-            {pct === 100 ? '🎉 Ver Resumo do Treino' : `Finalizar com ${pct}% concluído`}
-          </button>
+          <div className="mt-2">
+            <Button
+              variant={pct === 100 ? 'primary' : 'secondary'}
+              size="lg"
+              width="100%"
+              className="min-h-14 text-[17px] font-bold"
+              label={pct === 100 ? 'Ver resumo do treino' : `Finalizar com ${pct}% concluído`}
+              onClick={() => setShowModal(true)}
+            />
+          </div>
         )}
       </div>
     </div>

@@ -1,30 +1,12 @@
 import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@astryxdesign/core/Button';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { useAuth } from '../contexts/AuthContext';
+import { DumbbellIcon } from '../components/icons';
 
-function DumbbellIcon({ color = '#fff', size = 22 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="2"  y="9"  width="3" height="6" rx="1.5" fill={color}/>
-      <rect x="6"  y="7"  width="3" height="10" rx="1.5" fill={color}/>
-      <rect x="15" y="7"  width="3" height="10" rx="1.5" fill={color}/>
-      <rect x="19" y="9"  width="3" height="6" rx="1.5" fill={color}/>
-      <rect x="9"  y="11" width="6" height="2" rx="1" fill={color}/>
-    </svg>
-  );
-}
-
-const inputStyle = {
-  width: '100%',
-  padding: '16px',
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 16,
-  fontSize: 16,
-  fontWeight: 500,
-  color: '#fff',
-  outline: 'none',
-};
+// Campos altos (56px) e texto de 17px: digitação com uma mão, em pé, na academia.
+const controle = 'min-h-14 [&_input]:text-[17px]';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -37,6 +19,10 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!username.trim() || !password) {
+      setError('Informe seu usuário e sua senha.');
+      return;
+    }
     setError('');
     setLoading(true);
     const result = await login(username, password);
@@ -51,92 +37,68 @@ export default function Login() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-7 bg-ios-background"
-      style={{ animation: 'fadeIn 0.3s ease' }}
-    >
-      {/* Logo */}
-      <div className="text-center mb-12">
-        <div
-          className="w-[72px] h-[72px] flex items-center justify-center mx-auto mb-5"
-          style={{ background: '#00FF7F', borderRadius: 22 }}
-        >
-          <DumbbellIcon color="#000" size={34} />
+    <div className="min-h-dvh flex flex-col justify-center gap-10 px-6 py-10 bg-bg max-w-md mx-auto">
+      <header>
+        <div className="w-14 h-14 flex items-center justify-center rounded-2xl bg-primary text-on-primary">
+          <DumbbellIcon size={30} />
         </div>
-        <h1 className="text-[28px] font-black text-white" style={{ letterSpacing: '-0.02em' }}>
-          PTRoster
-        </h1>
-        <p className="text-[12px] font-bold text-ios-text-secondary mt-1 uppercase" style={{ letterSpacing: '0.12em' }}>
-          Portal do Aluno
-        </p>
-      </div>
+        <h1 className="mt-6 text-[40px] leading-none font-black tracking-[-0.03em] text-ink">PTRoster</h1>
+        <p className="mt-2 text-[17px] text-ink-muted">Portal do aluno</p>
+      </header>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="w-full max-w-sm">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         {error && (
-          <div
-            className="p-3 mb-4 text-[13px] font-bold text-center rounded-2xl"
-            style={{
-              background: 'rgba(255,69,58,0.1)',
-              border: '1px solid rgba(255,69,58,0.25)',
-              color: '#FF453A',
-              animation: shake ? 'shake 0.4s ease' : 'none',
-            }}
+          <p
+            role="alert"
+            className={`px-4 py-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-[15px] font-semibold ${
+              shake ? 'animate-[shake_0.4s_ease]' : ''
+            }`}
           >
             {error}
-          </div>
+          </p>
         )}
 
-        <div className="mb-3">
-          <label className="block text-[11px] font-bold text-ios-text-secondary uppercase mb-2" style={{ letterSpacing: '0.1em' }}>
-            CPF ou Usuário
-          </label>
-          <input
-            type="text"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            placeholder="Ex.: 123.456.789-00"
-            className="input-dark"
-            style={inputStyle}
-            autoComplete="username"
-            required
-          />
-        </div>
+        <TextInput
+          label="CPF ou usuário"
+          value={username}
+          onChange={setUsername}
+          size="lg"
+          width="100%"
+          controlClassName={controle}
+          autoComplete="username"
+          autoCapitalize="none"
+          hasAutoCorrect={false}
+          hasSpellCheck={false}
+          enterKeyHint="next"
+          htmlName="username"
+        />
 
-        <div className="mb-6">
-          <label className="block text-[11px] font-bold text-ios-text-secondary uppercase mb-2" style={{ letterSpacing: '0.1em' }}>
-            Senha
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="input-dark"
-            style={inputStyle}
-            autoComplete="current-password"
-            required
-          />
-        </div>
+        <TextInput
+          label="Senha"
+          type="password"
+          value={password}
+          onChange={setPassword}
+          size="lg"
+          width="100%"
+          controlClassName={controle}
+          autoComplete="current-password"
+          enterKeyHint="go"
+          htmlName="password"
+        />
 
-        <button
+        <Button
           type="submit"
-          disabled={loading}
-          className="w-full font-black text-black border-none cursor-pointer"
-          style={{
-            padding: '18px',
-            borderRadius: 16,
-            fontSize: 16,
-            background: loading ? 'rgba(0,255,127,0.55)' : '#00FF7F',
-            boxShadow: loading ? 'none' : '0 0 28px rgba(0,255,127,0.3)',
-          }}
-        >
-          {loading ? 'Entrando...' : 'Entrar no Treino →'}
-        </button>
+          variant="primary"
+          size="lg"
+          width="100%"
+          className="min-h-14 text-[17px] font-bold mt-1"
+          label="Entrar"
+          isLoading={loading}
+        />
       </form>
 
-      <p className="mt-10 text-center text-[11px] font-medium leading-relaxed" style={{ color: '#555' }}>
-        Peça suas credenciais ao seu<br />Personal Trainer responsável
+      <p className="text-[14px] leading-relaxed text-ink-dim">
+        Ainda não tem acesso? Peça seu usuário e senha ao seu personal trainer.
       </p>
     </div>
   );

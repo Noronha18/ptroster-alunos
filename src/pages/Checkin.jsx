@@ -2,17 +2,26 @@ import { useEffect, useState } from 'react';
 import { useAluno } from '../hooks/useAluno';
 import { useSessoes } from '../hooks/useSessoes';
 import { useToast } from '../hooks/useToast';
+import { Button } from '@astryxdesign/core/Button';
 import { Toast } from '../components/Toast';
+import { PageLoader } from '../components/PageLoader';
+import { CheckIcon } from '../components/icons';
 
 const ATIVIDADES_LIVRES = ['Corrida', 'Cardio', 'Natação', 'Funcional'];
 
-const ICONES_ATIVIDADE = {
-  Corrida:   '🏃',
-  Cardio:    '🔥',
-  Natação:   '🏊',
-  Funcional: '⚡',
-  Outro:     '🏋️',
-};
+// Cartão de escolha (plano ou atividade): 64px de altura, estado marcado por cor + ícone.
+const opcao = (ativo) =>
+  `press w-full min-h-16 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 text-left border transition-colors ${
+    ativo ? 'bg-primary/10 border-primary text-ink' : 'bg-surface border-line text-ink'
+  }`;
+
+function Marcado() {
+  return (
+    <span className="w-7 h-7 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0">
+      <CheckIcon size={16} />
+    </span>
+  );
+}
 
 const formatarDataCompleta = () => {
   const dias  = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
@@ -69,50 +78,43 @@ export default function Checkin() {
 
     const resultado = await fazerCheckin(payload);
     if (resultado.success) {
-      show('Presença confirmada! Bom treino! 💪', 'success');
+      show('Presença confirmada! Bom treino!', 'success');
     } else {
       show(resultado.message, 'error');
     }
   };
 
-  if (loading || loadingSessao) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-ios-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading || loadingSessao) return <PageLoader />;
 
   if (sessaoHoje) {
     const nomeAtividade = labelSessao(sessaoHoje, aluno?.planos_treino);
     return (
-      <div
-        className="min-h-screen bg-ios-background flex flex-col items-center justify-center px-7 text-center"
-      >
-        <div style={{ animation: 'pop 0.4s cubic-bezier(0.16,1,0.3,1)' }}>
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
-            style={{ background: 'rgba(0,255,127,0.1)', border: '3px solid #00FF7F' }}
-          >
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-              <path d="M8 18l7 7L28 12" stroke="#00FF7F" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <h2 className="text-[26px] font-black text-white mb-2" style={{ letterSpacing: '-0.02em' }}>
-            Presença Confirmada!
-          </h2>
-          <p className="text-sm text-ios-text-secondary mb-1">
-            Check-in realizado às {formatarHora(sessaoHoje.data_hora)}
+      <div className="min-h-[calc(100dvh-5rem)] bg-bg flex flex-col justify-center px-5 py-8 max-w-lg mx-auto">
+        <div className="animate-[pop_0.4s_var(--ease-out-quint)]">
+          <span className="w-20 h-20 rounded-full bg-primary text-on-primary flex items-center justify-center">
+            <CheckIcon size={40} />
+          </span>
+          <h1 className="mt-6 text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">
+            Presença confirmada!
+          </h1>
+          <p className="mt-2 text-[17px] text-ink-muted">
+            Check-in feito às <span className="num">{formatarHora(sessaoHoje.data_hora)}</span>. Continue assim!
           </p>
-          <p className="text-[13px] font-bold mb-7" style={{ color: '#00FF7F' }}>
-            🔥 Continue assim!
-          </p>
-          <div
-            className="w-full rounded-2xl p-5 text-left"
-            style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}
-          >
-            <p className="text-[13px] text-ios-text-secondary mb-1">{formatarDataCompleta()}</p>
-            <p className="text-[16px] font-black text-white">{nomeAtividade}</p>
+
+          <dl className="mt-8 rounded-2xl bg-surface border border-line p-5">
+            <dt className="text-[14px] text-ink-muted">{formatarDataCompleta()}</dt>
+            <dd className="mt-1 text-[20px] font-bold text-ink">{nomeAtividade}</dd>
+          </dl>
+
+          <div className="mt-6">
+            <Button
+              variant="secondary"
+              size="lg"
+              width="100%"
+              className="min-h-14 text-[17px] font-bold"
+              label="Ir para os treinos"
+              href="/treinos"
+            />
           </div>
         </div>
         <Toast toast={toast} />
@@ -121,29 +123,25 @@ export default function Checkin() {
   }
 
   return (
-    <div className="min-h-screen bg-ios-background px-5 pt-6 pb-6 flex flex-col">
-      <div className="mb-5">
-        <h1 className="text-[28px] font-black text-white mb-1" style={{ letterSpacing: '-0.02em' }}>Check-in</h1>
-        <p className="text-[14px] text-ios-text-secondary">{formatarDataCompleta()}</p>
-      </div>
+    <div className="min-h-[calc(100dvh-5rem)] bg-bg px-5 pt-5 pb-6 flex flex-col max-w-lg mx-auto">
+      <header className="mb-6">
+        <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">Check-in</h1>
+        <p className="mt-1 text-[15px] text-ink-muted">{formatarDataCompleta()}</p>
+      </header>
 
-      {/* Toggle de modo */}
-      <div
-        className="flex rounded-2xl p-1 mb-5"
-        style={{ background: '#1A1A1A', border: '1px solid rgba(255,255,255,0.07)' }}
-      >
+      {/* Alternar entre plano e atividade livre */}
+      <div className="flex rounded-2xl p-1 mb-5 bg-surface border border-line" role="group" aria-label="Tipo de check-in">
         {[
-          { key: 'plano', label: 'Plano Prescrito' },
-          { key: 'livre', label: 'Atividade Livre' },
+          { key: 'plano', label: 'Plano prescrito' },
+          { key: 'livre', label: 'Atividade livre' },
         ].map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setModo(key)}
-            className="flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all"
-            style={{
-              background: modo === key ? '#00FF7F' : 'transparent',
-              color: modo === key ? '#000' : '#888',
-            }}
+            aria-pressed={modo === key}
+            className={`flex-1 min-h-12 rounded-xl text-[15px] font-bold transition-colors ${
+              modo === key ? 'bg-primary text-on-primary' : 'text-ink-muted'
+            }`}
           >
             {label}
           </button>
@@ -151,135 +149,86 @@ export default function Checkin() {
       </div>
 
       {/* Conteúdo do modo selecionado — key reinicia o fade ao alternar */}
-      <div key={modo} className="flex-1" style={{ animation: 'fadeIn 0.2s ease' }}>
-      {modo === 'plano' ? (
-        <div className="flex-1">
-          {planos.length === 0 ? (
-            <div
-              className="rounded-2xl p-4 text-center"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-            >
-              <p className="text-ios-text-secondary text-sm">Nenhum plano ativo. O check-in será registrado sem plano.</p>
-            </div>
+      <div key={modo} className="flex-1 animate-[fadeIn_0.2s_ease]">
+        {modo === 'plano' ? (
+          planos.length === 0 ? (
+            <p className="rounded-2xl p-4 bg-surface border border-line text-[16px] text-ink-muted">
+              Você não tem um plano ativo. O check-in será registrado sem plano.
+            </p>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-3">
               {planos.map(plano => {
                 const ativo = planoSelecionado === plano.id;
                 return (
-                  <button
-                    key={plano.id}
-                    onClick={() => setPlanoSelecionado(plano.id)}
-                    className="w-full rounded-2xl p-4 text-left transition-all"
-                    style={{
-                      background: ativo ? 'rgba(0,255,127,0.08)' : '#1A1A1A',
-                      border: `1px solid ${ativo ? 'rgba(0,255,127,0.3)' : 'rgba(255,255,255,0.07)'}`,
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[15px] font-black text-white">{plano.titulo}</p>
-                        {plano.objetivo_estrategico && (
-                          <p className="text-xs text-ios-text-secondary mt-0.5 line-clamp-1">{plano.objetivo_estrategico}</p>
-                        )}
-                      </div>
-                      {ativo && (
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 ml-3"
-                          style={{ background: '#00FF7F' }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6l3 3 5-5" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        </div>
+                  <button key={plano.id} onClick={() => setPlanoSelecionado(plano.id)} aria-pressed={ativo} className={opcao(ativo)}>
+                    <span className="min-w-0">
+                      <span className="block text-[17px] font-bold">{plano.titulo}</span>
+                      {plano.objetivo_estrategico && (
+                        <span className="block text-[14px] text-ink-muted mt-0.5 line-clamp-1">{plano.objetivo_estrategico}</span>
                       )}
-                    </div>
+                    </span>
+                    {ativo && <Marcado />}
                   </button>
                 );
               })}
             </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex-1">
-          <p className="text-[13px] text-ios-text-secondary mb-3 font-medium">Qual atividade você fez?</p>
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            {ATIVIDADES_LIVRES.map(atividade => {
-              const ativo = atividadeSelecionada === atividade && !mostrarOutro;
-              return (
-                <button
-                  key={atividade}
-                  onClick={() => { setAtividadeSelecionada(atividade); setMostrarOutro(false); }}
-                  className="rounded-2xl p-4 flex flex-col items-center gap-2 transition-all"
-                  style={{
-                    background: ativo ? 'rgba(0,255,127,0.08)' : '#1A1A1A',
-                    border: `1px solid ${ativo ? 'rgba(0,255,127,0.3)' : 'rgba(255,255,255,0.07)'}`,
-                  }}
-                >
-                  <span className="text-2xl">{ICONES_ATIVIDADE[atividade]}</span>
-                  <span className="text-[13px] font-bold" style={{ color: ativo ? '#00FF7F' : '#fff' }}>
-                    {atividade}
-                  </span>
-                </button>
-              );
-            })}
-            <button
-              onClick={() => { setAtividadeSelecionada('Outro'); setMostrarOutro(true); }}
-              className="rounded-2xl p-4 flex flex-col items-center gap-2 transition-all"
-              style={{
-                background: mostrarOutro ? 'rgba(0,255,127,0.08)' : '#1A1A1A',
-                border: `1px solid ${mostrarOutro ? 'rgba(0,255,127,0.3)' : 'rgba(255,255,255,0.07)'}`,
-              }}
-            >
-              <span className="text-2xl">{ICONES_ATIVIDADE['Outro']}</span>
-              <span className="text-[13px] font-bold" style={{ color: mostrarOutro ? '#00FF7F' : '#fff' }}>Outro</span>
-            </button>
-          </div>
+          )
+        ) : (
+          <>
+            <h2 className="text-[16px] font-semibold text-ink-muted mb-3">Qual atividade você fez?</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {ATIVIDADES_LIVRES.map(atividade => {
+                const ativo = atividadeSelecionada === atividade && !mostrarOutro;
+                return (
+                  <button
+                    key={atividade}
+                    onClick={() => { setAtividadeSelecionada(atividade); setMostrarOutro(false); }}
+                    aria-pressed={ativo}
+                    className={opcao(ativo)}
+                  >
+                    <span className="text-[17px] font-bold">{atividade}</span>
+                    {ativo && <Marcado />}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => { setAtividadeSelecionada('Outro'); setMostrarOutro(true); }}
+                aria-pressed={mostrarOutro}
+                className={`${opcao(mostrarOutro)} col-span-2`}
+              >
+                <span className="text-[17px] font-bold">Outra atividade</span>
+                {mostrarOutro && <Marcado />}
+              </button>
+            </div>
 
-          {mostrarOutro && (
-            <input
-              type="text"
-              placeholder="Ex: Muay Thai, Yoga, Caminhada..."
-              value={outraAtividade}
-              onChange={e => setOutraAtividade(e.target.value)}
-              maxLength={60}
-              className="input-dark w-full rounded-2xl px-4 py-3.5 text-white text-[14px] font-medium outline-none"
-              style={{
-                background: '#1A1A1A',
-                border: '1px solid rgba(0,255,127,0.3)',
-              }}
-            />
-          )}
-        </div>
-      )}
+            {mostrarOutro && (
+              <input
+                type="text"
+                aria-label="Nome da atividade"
+                placeholder="Ex.: muay thai, yoga, caminhada"
+                value={outraAtividade}
+                onChange={e => setOutraAtividade(e.target.value)}
+                maxLength={60}
+                className="input-dark mt-3 w-full h-14 rounded-xl px-4 bg-surface border border-line text-ink text-[17px] outline-none placeholder:text-ink-dim"
+              />
+            )}
+          </>
+        )}
       </div>
 
-      {/* Botão CTA */}
-      <div className="pt-5">
-        <button
+      {/* Ação principal, sempre no fim da tela, ao alcance do polegar */}
+      <div className="pt-6">
+        <Button
+          variant="primary"
+          size="lg"
+          width="100%"
+          className="min-h-14 text-[17px] font-bold"
+          label="Confirmar presença"
           onClick={handleCheckin}
-          disabled={checkingIn || !podeConcluir}
-          className="w-full font-black text-black rounded-2xl flex items-center justify-center gap-2"
-          style={{
-            padding: '18px',
-            fontSize: 17,
-            background: (checkingIn || !podeConcluir) ? 'rgba(0,255,127,0.4)' : '#00FF7F',
-            cursor: (checkingIn || !podeConcluir) ? 'default' : 'pointer',
-            transition: 'opacity 0.2s',
-          }}
-        >
-          {checkingIn ? (
-            <>
-              <svg className="animate-spin h-5 w-5 text-black" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Confirmando...
-            </>
-          ) : '✓ Confirmar Presença'}
-        </button>
-        <p className="text-center text-xs text-ios-text-secondary mt-3 font-medium">
-          Registra sua presença na aula de hoje
-        </p>
+          isLoading={checkingIn}
+          isDisabled={!podeConcluir}
+        />
+        <p className="text-center text-[14px] text-ink-muted mt-3">Registra sua presença no treino de hoje.</p>
       </div>
 
       <Toast toast={toast} />

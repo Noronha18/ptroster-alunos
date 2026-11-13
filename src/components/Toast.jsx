@@ -2,9 +2,9 @@ export function Toast({ toast }) {
   if (!toast) return null;
 
   const styles = {
-    success: 'bg-ios-green',
-    error: 'bg-ios-red',
-    info: 'bg-ios-blue',
+    success: 'bg-primary text-on-primary',
+    error: 'bg-danger text-on-primary',
+    info: 'bg-surface-2 text-ink border border-line',
   };
 
   const icons = {
@@ -27,11 +27,11 @@ export function Toast({ toast }) {
 
   return (
     <div
-      className={`fixed bottom-24 left-4 right-4 z-50 ${styles[toast.type]} text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3`}
-      style={{ animation: 'slideUp 0.3s var(--ease-out-quint), fadeOutDown 0.25s ease-in 3.2s forwards' }}
+      role={toast.type === 'error' ? 'alert' : 'status'}
+      className={`fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 max-w-lg mx-auto ${styles[toast.type]} px-5 py-4 rounded-2xl shadow-[0_12px_32px_rgb(0_0_0/0.5)] flex items-center gap-3 animate-[slideUp_0.3s_var(--ease-out-quint),fadeOutDown_0.25s_ease-in_3.2s_forwards]`}
     >
       {icons[toast.type]}
-      <p className="font-bold text-sm leading-snug">{toast.message}</p>
+      <p className="font-bold text-[15px] leading-snug text-inherit">{toast.message}</p>
     </div>
   );
 }

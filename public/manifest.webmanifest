@@ -4,8 +4,8 @@
   "description": "Acompanhe seus treinos e presenças",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#a3ff00",
+  "background_color": "#0B0C0E",
+  "theme_color": "#0B0C0E",
   "orientation": "portrait",
   "icons": [
     {
