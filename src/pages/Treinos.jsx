@@ -373,11 +373,16 @@ export function ExercicioAccordion({ prescricao, numero, groupPosition, doneSets
 }
 
 /* ─── Rascunho ───────────────────────────────────────── */
+const VALIDADE_RASCUNHO_MS = 24 * 60 * 60 * 1000;
 const chaveRascunho = (treinoId) => `ptroster_rascunho_${getAlunoId()}_${treinoId}`;
 
 function lerRascunho(treinoId) {
   try {
-    return JSON.parse(localStorage.getItem(chaveRascunho(treinoId)));
+    const chave = chaveRascunho(treinoId);
+    const rascunho = JSON.parse(localStorage.getItem(chave));
+    if (rascunho && Date.now() - rascunho.salvoEm < VALIDADE_RASCUNHO_MS) return rascunho;
+    localStorage.removeItem(chave);
+    return null;
   } catch {
     return null;
   }
@@ -385,7 +390,7 @@ function lerRascunho(treinoId) {
 
 function gravarRascunho(treinoId, rascunho) {
   try {
-    if (rascunho) localStorage.setItem(chaveRascunho(treinoId), JSON.stringify(rascunho));
+    if (rascunho) localStorage.setItem(chaveRascunho(treinoId), JSON.stringify({ ...rascunho, salvoEm: Date.now() }));
     else localStorage.removeItem(chaveRascunho(treinoId));
   } catch {
     // modo privado ou storage cheio: segue sem rascunho
@@ -407,6 +412,8 @@ export default function Treinos() {
   const [showModal, setShowModal]     = useState(false);
   const [valores, setValores]         = useState({});
   const [salvando, setSalvando]       = useState(false);
+  const camposEditados = useRef({});
+  const [treinoRascunhoId, setTreinoRascunhoId] = useState(null);
   const timerRef                      = useRef(null);
 
   // Card "Hoje" do Dashboard abre o treino sugerido via ?treino=<id>.
@@ -446,6 +453,8 @@ export default function Treinos() {
     clearTimeout(timerRef.current);
     if (!selectedTreino) return;
 
+    camposEditados.current = {};
+    setTreinoRascunhoId(selectedTreino.id);
     const rascunho = lerRascunho(selectedTreino.id);
     setDoneSets(rascunho?.doneSets ?? {});
     if (rascunho?.valores) {
@@ -455,23 +464,38 @@ export default function Treinos() {
     setValores(valoresIniciais(selectedTreino.prescricoes, []));
     let ativo = true;
     api.get('/alunos/me/ultima-execucao', { params: { treino_id: selectedTreino.id } })
-      .then(({ data }) => { if (ativo) setValores(valoresIniciais(selectedTreino.prescricoes, data)); })
+      .then(({ data }) => {
+        if (!ativo) return;
+        const iniciais = valoresIniciais(selectedTreino.prescricoes, data);
+        for (const [chave, campos] of Object.entries(camposEditados.current)) {
+          iniciais[chave] = { ...iniciais[chave], ...campos };
+        }
+        setValores(iniciais);
+      })
       .catch(() => {});  // sem histórico: fica o prescrito
     return () => { ativo = false; };
   }, [selectedTreino?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Rascunho só depois que o aluno marcou alguma série
+  // Guarda edições e marcações apenas no rascunho do treino carregado.
   useEffect(() => {
-    if (selectedTreino && Object.keys(doneSets).length > 0) {
+    if (selectedTreino && treinoRascunhoId === selectedTreino.id &&
+        (Object.keys(doneSets).length > 0 || Object.keys(camposEditados.current).length > 0)) {
       gravarRascunho(selectedTreino.id, { doneSets, valores });
     }
-  }, [doneSets, valores]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [doneSets, valores, treinoRascunhoId, selectedTreino]);
 
   function mudarValor(chave, campo, valor) {
+    camposEditados.current[chave] = { ...camposEditados.current[chave], [campo]: valor };
     setValores(prev => ({ ...prev, [chave]: { ...prev[chave], [campo]: valor } }));
   }
 
   async function salvarTreino() {
+    if (Object.entries(valores).some(([chave, { reps, kg }]) =>
+      doneSets[chave] && (Number(reps) < 0 || Number(String(kg).replace(',', '.')) < 0),
+    )) {
+      show('Repetições e carga devem ser zero ou maiores nas séries marcadas.', 'error');
+      return;
+    }
     const series = seriesParaEnvio(selectedTreino.prescricoes, valores, chave => doneSets[chave]);
     if (series.length === 0) {
       show('Marque ao menos uma série com repetições.', 'error');
@@ -485,7 +509,11 @@ export default function Treinos() {
       setDoneSets({});
       show('Treino salvo!');
       navigate('/historico');
-    } catch {
+    } catch (erro) {
+      if (erro.response?.status === 422) {
+        show('Confira as repetições e a carga das séries marcadas.', 'error');
+        return;
+      }
       // Rascunho continua salvo; o botão do modal é o "tentar de novo"
       show('Não foi possível salvar. Toque em "Salvar treino" para tentar de novo.', 'error');
     } finally {
