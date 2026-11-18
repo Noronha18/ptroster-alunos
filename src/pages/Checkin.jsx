@@ -4,6 +4,7 @@ import { useSessoes } from '../hooks/useSessoes';
 import { useToast } from '../hooks/useToast';
 import { Button } from '@astryxdesign/core/Button';
 import { Toast } from '../components/Toast';
+import { ErroCarregamento } from '../components/ErroCarregamento';
 import { PageLoader } from '../components/PageLoader';
 import { CheckIcon } from '../components/icons';
 
@@ -46,22 +47,22 @@ const labelSessao = (sessao, planos) => {
 
 export default function Checkin() {
   const { aluno, loading }                                                        = useAluno();
-  const { sessaoHoje, loadingSessao, checkingIn, buscarSessaoHoje, fazerCheckin } = useSessoes();
+  const { sessaoHoje, loadingSessao, erroSessao, checkingIn, buscarSessaoHoje, fazerCheckin } = useSessoes();
   const { toast, show }                                                           = useToast();
 
   const planos = aluno?.planos_treino?.filter(p => p.esta_ativo) ?? [];
 
   const [modo, setModo]                           = useState('plano');
-  const [planoSelecionado, setPlanoSelecionado]   = useState(null);
+  const [planoEscolhido, setPlanoSelecionado]   = useState(null);
   const [atividadeSelecionada, setAtividadeSelecionada] = useState(null);
   const [outraAtividade, setOutraAtividade]       = useState('');
   const [mostrarOutro, setMostrarOutro]           = useState(false);
 
   useEffect(() => { buscarSessaoHoje(); }, [buscarSessaoHoje]);
 
-  useEffect(() => {
-    if (planos.length === 1) setPlanoSelecionado(planos[0].id);
-  }, [aluno]);
+  const planoSelecionado = planos.length === 1
+    ? planos[0].id
+    : planos.find(plano => plano.id === planoEscolhido)?.id ?? null;
 
   const podeConcluir = modo === 'plano'
     ? (planoSelecionado !== null || planos.length === 0)
@@ -86,6 +87,13 @@ export default function Checkin() {
 
   if (loading || loadingSessao) return <PageLoader />;
 
+  if (erroSessao) return (
+    <div className="mx-auto max-w-lg space-y-4 px-5 pt-5">
+      <h1 className="text-[32px] font-black text-ink">Presença</h1>
+      <ErroCarregamento mensagem={erroSessao} tentarNovamente={buscarSessaoHoje} />
+    </div>
+  );
+
   if (sessaoHoje) {
     const nomeAtividade = labelSessao(sessaoHoje, aluno?.planos_treino);
     return (
@@ -98,7 +106,7 @@ export default function Checkin() {
             Presença confirmada!
           </h1>
           <p className="mt-2 text-[17px] text-ink-muted">
-            Check-in feito às <span className="num">{formatarHora(sessaoHoje.data_hora)}</span>. Continue assim!
+            Presença registrada às <span className="num">{formatarHora(sessaoHoje.data_hora)}</span>. Continue assim!
           </p>
 
           <dl className="mt-8 rounded-2xl bg-surface border border-line p-5">
@@ -125,7 +133,8 @@ export default function Checkin() {
   return (
     <div className="min-h-[calc(100dvh-5rem)] bg-bg px-5 pt-5 pb-6 flex flex-col max-w-lg mx-auto">
       <header className="mb-6">
-        <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">Check-in</h1>
+        <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">Presença</h1>
+        <p className="mt-2 text-[15px] text-ink-muted">Aqui você registra a presença. Repetições e cargas ficam na tela Treinos.</p>
         <p className="mt-1 text-[15px] text-ink-muted">{formatarDataCompleta()}</p>
       </header>
 

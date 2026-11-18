@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useSessoes } from '../hooks/useSessoes';
 import { useAluno } from '../hooks/useAluno';
 import { Button } from '@astryxdesign/core/Button';
+import { ErroCarregamento } from '../components/ErroCarregamento';
 import { PageLoader } from '../components/PageLoader';
 import { CheckIcon, FlameIcon } from '../components/icons';
 import { calcularStreak, treinosNoMes } from '../utils/dashboard';
@@ -28,7 +29,7 @@ function getWeeklyData(historico) {
 function WeeklyBars({ data }) {
   const maxCount = Math.max(...data.map(d => d.count), 1);
   return (
-    <ol className="flex items-end gap-2 h-32" aria-label="Sessões por semana, das mais antigas para a atual">
+    <ol className="flex items-end gap-2 h-32" aria-label="Sessões em períodos de sete dias, dos mais antigos para o atual">
       {data.map((d, i) => {
         const atual = i === data.length - 1;
         return (
@@ -52,23 +53,30 @@ const labelSessao = (sessao, planos) => {
     const plano = planos?.find(p => p.id === sessao.plano_treino_id);
     if (plano) return plano.titulo;
   }
-  return 'Sessão Presencial';
+  return sessao.treino_id ? 'Treino concluído' : 'Presença registrada';
 };
 
 export default function Historico() {
-  const { historico, loadingHistorico, buscarHistorico } = useSessoes();
+  const { historico, loadingHistorico, erroHistorico, buscarHistorico } = useSessoes();
   const { aluno } = useAluno();
 
   useEffect(() => { buscarHistorico(); }, [buscarHistorico]);
 
   if (loadingHistorico) return <PageLoader />;
 
+  if (erroHistorico) return (
+    <div className="mx-auto max-w-lg space-y-4 px-5 pt-5">
+      <h1 className="text-[32px] font-black text-ink">Histórico</h1>
+      <ErroCarregamento mensagem={erroHistorico} tentarNovamente={buscarHistorico} />
+    </div>
+  );
+
   if (historico.length === 0) {
     return (
       <div className="min-h-[calc(100dvh-5rem)] bg-bg px-5 pt-5 max-w-lg mx-auto">
         <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">Histórico</h1>
         <p className="mt-3 text-[17px] text-ink-muted">
-          Nenhum treino registrado ainda. Faça seu primeiro check-in e ele aparece aqui.
+          Nenhuma sessão registrada. Seus check-ins e treinos concluídos aparecem aqui.
         </p>
         <div className="mt-6">
           <Button variant="primary" size="lg" width="100%" className="min-h-14 text-[17px] font-bold" label="Fazer check-in" href="/checkin" />
@@ -85,27 +93,27 @@ export default function Historico() {
     <div className="min-h-screen bg-bg px-5 pt-5 pb-6 max-w-lg mx-auto flex flex-col gap-7">
       <header>
         <h1 className="text-[32px] leading-[1.1] font-black tracking-[-0.02em] text-ink">Histórico</h1>
-        <p className="mt-1 text-[15px] text-ink-muted">Últimas 8 semanas</p>
+        <p className="mt-1 text-[15px] text-ink-muted">Até 30 sessões recentes</p>
       </header>
 
       <section className="rounded-2xl bg-surface border border-line p-5" aria-labelledby="por-semana">
-        <h2 id="por-semana" className="text-[15px] font-semibold text-ink-muted">Sessões por semana</h2>
+        <h2 id="por-semana" className="text-[15px] font-semibold text-ink-muted">Sessões por período de 7 dias</h2>
         <p className="mt-1 mb-5 text-[16px] text-ink-muted">
-          <span className="num text-[36px] leading-none font-black text-ink">{weeklyData[weeklyData.length - 1].count}</span> esta semana
+          <span className="num text-[36px] leading-none font-black text-ink">{weeklyData[weeklyData.length - 1].count}</span> nos últimos 7 dias
         </p>
         <WeeklyBars data={weeklyData} />
 
         <dl className="mt-5 pt-4 border-t border-line grid grid-cols-3 gap-3">
           <div>
-            <dt className="text-[13px] text-ink-muted">Este mês</dt>
+            <dt className="text-[13px] text-ink-muted">Neste mês (no recorte)</dt>
             <dd className="num text-[22px] font-bold text-ink">{thisMes}</dd>
           </div>
           <div>
-            <dt className="text-[13px] text-ink-muted">Total</dt>
+            <dt className="text-[13px] text-ink-muted">Sessões exibidas</dt>
             <dd className="num text-[22px] font-bold text-ink">{historico.length}</dd>
           </div>
           <div>
-            <dt className="text-[13px] text-ink-muted">Sequência</dt>
+            <dt className="text-[13px] text-ink-muted">Dias seguidos (no recorte)</dt>
             <dd className={`num flex items-center gap-1 text-[22px] font-bold ${streak > 0 ? 'text-alert' : 'text-ink'}`}>
               <FlameIcon size={18} /> {streak} <span className="text-[14px] font-semibold">{streak === 1 ? 'dia' : 'dias'}</span>
             </dd>
@@ -114,7 +122,7 @@ export default function Historico() {
       </section>
 
       <section aria-labelledby="registro">
-        <h2 id="registro" className="text-[18px] font-bold text-ink mb-1">Registro de treinos</h2>
+        <h2 id="registro" className="text-[18px] font-bold text-ink mb-1">Sessões recentes</h2>
         <ul className="divide-y divide-line border-y border-line">
           {historico.map(sessao => (
             <li key={sessao.id} className="flex items-center justify-between gap-3 py-3.5">

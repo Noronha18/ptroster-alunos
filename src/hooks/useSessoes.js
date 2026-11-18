@@ -6,10 +6,12 @@ import { dataLocalISO } from '../utils/date';
 export function useSessoes() {
   const [sessaoHoje, setSessaoHoje] = useState(null);
   const [loadingSessao, setLoadingSessao] = useState(true);
+  const [erroSessao, setErroSessao] = useState(null);
   const [checkingIn, setCheckingIn] = useState(false);
 
   const [historico, setHistorico] = useState([]);
-  const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [loadingHistorico, setLoadingHistorico] = useState(true);
+  const [erroHistorico, setErroHistorico] = useState(null);
 
   const buscarSessaoHoje = useCallback(async () => {
     const alunoId = getAlunoId();
@@ -18,6 +20,7 @@ export function useSessoes() {
       return;
     }
     setLoadingSessao(true);
+    setErroSessao(null);
     try {
       const hoje = dataLocalISO();
       const { data } = await api.get('/sessoes/', {
@@ -25,7 +28,8 @@ export function useSessoes() {
       });
       setSessaoHoje(data[0] ?? null);
     } catch {
-      // sem sessão hoje é ok
+      setSessaoHoje(null);
+      setErroSessao("Não foi possível verificar sua presença de hoje.");
     } finally {
       setLoadingSessao(false);
     }
@@ -33,8 +37,12 @@ export function useSessoes() {
 
   const buscarHistorico = useCallback(async () => {
     const alunoId = getAlunoId();
-    if (!alunoId) return;
+    if (!alunoId) {
+      setLoadingHistorico(false);
+      return;
+    }
     setLoadingHistorico(true);
+    setErroHistorico(null);
     try {
       const { data } = await api.get('/sessoes/', {
         params: { aluno_id: alunoId, realizada: true, limit: 30 },
@@ -42,8 +50,9 @@ export function useSessoes() {
       // Ordenar por data decrescente (mais recentes primeiro)
       const ordenado = [...data].sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora));
       setHistorico(ordenado);
-    } catch (error) {
-      console.error('Erro ao buscar histórico:', error);
+    } catch {
+      setHistorico([]);
+      setErroHistorico("Não foi possível carregar suas sessões recentes.");
     } finally {
       setLoadingHistorico(false);
     }
@@ -79,6 +88,8 @@ export function useSessoes() {
     historico,
     loadingSessao, 
     loadingHistorico,
+    erroSessao,
+    erroHistorico,
     checkingIn, 
     buscarSessaoHoje, 
     buscarHistorico,

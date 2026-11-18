@@ -7,8 +7,8 @@ export function BannerAvisos({ aluno }) {
   const avisos = [];
   const venc = aluno.dias_para_vencimento_consultoria;
   const fim = aluno.dias_para_fim_programa;
-  if (venc != null && venc >= 0 && venc <= JANELA) {
-    avisos.push(`Sua consultoria vence ${emDias(venc)}.`);
+  if (venc != null && venc <= JANELA) {
+    avisos.push(venc < 0 ? 'Sua consultoria venceu. Fale com seu personal.' : `Sua consultoria vence ${emDias(venc)}.`);
   }
   if (fim != null && fim <= JANELA) {
     avisos.push(fim < 0 ? 'Seu programa de treino terminou. Fale com seu treinador.' : `Seu programa termina ${emDias(fim)}.`);

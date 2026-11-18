@@ -3,8 +3,9 @@ import { Button } from '@astryxdesign/core/Button';
 import { useAuth } from '../contexts/AuthContext';
 import { useAluno } from '../hooks/useAluno';
 import { useSessoes } from '../hooks/useSessoes';
+import { ErroCarregamento } from '../components/ErroCarregamento';
 import { PageLoader } from '../components/PageLoader';
-import { calcularStreak, treinosNoMes } from '../utils/dashboard';
+import { calcularStreak } from '../utils/dashboard';
 
 const iniciais = (nome) => {
   if (!nome) return '??';
@@ -45,20 +46,21 @@ function MetaBar({ label, current, target, unit }) {
 export default function Perfil() {
   const { logout }                     = useAuth();
   const { aluno, planoAtivo, loading } = useAluno();
-  const { historico, buscarHistorico } = useSessoes();
+  const { historico, loadingHistorico, erroHistorico, buscarHistorico } = useSessoes();
 
   useEffect(() => { buscarHistorico(); }, [buscarHistorico]);
 
   if (loading) return <PageLoader />;
 
-  const streak  = calcularStreak(historico);
-  const thisMes = treinosNoMes(historico);
+  const streak = loadingHistorico || erroHistorico ? '—' : calcularStreak(historico);
+  const thisMes = aluno?.aulas_feitas_mes;
+  const mostrarSaldo = aluno?.modalidade === 'presencial' && aluno?.tipo_pagamento === 'pacote';
   const metaMes = (aluno?.frequencia_semanal_plano ?? 0) * 4;
 
   const numeros = [
-    ['Saldo de aulas', aluno?.saldo_aulas ?? '—'],
-    ['Treinos no mês', thisMes],
-    ['Dias seguidos', streak],
+    ...(mostrarSaldo ? [['Saldo de aulas', aluno?.saldo_aulas ?? '—']] : []),
+    ['Sessões no mês', thisMes ?? '—'],
+    ['Dias seguidos (até 30 sessões)', streak],
     ['Treinos por semana', aluno?.frequencia_semanal_plano ?? '—'],
   ];
 
@@ -89,18 +91,12 @@ export default function Perfil() {
         ))}
       </dl>
 
-      {metaMes > 0 && (
+      {erroHistorico && <ErroCarregamento mensagem={erroHistorico} tentarNovamente={buscarHistorico} />}
+
+      {metaMes > 0 && thisMes != null && (
         <section aria-labelledby="metas" className="flex flex-col gap-5">
-          <h2 id="metas" className="text-[18px] font-bold text-ink">Metas do mês</h2>
-          <MetaBar label="Treinos no mês" current={thisMes} target={metaMes} unit="treinos" />
-          {aluno?.saldo_aulas !== undefined && aluno.saldo_aulas > 0 && (
-            <MetaBar
-              label="Saldo de aulas"
-              current={aluno.saldo_aulas}
-              target={Math.max(aluno.saldo_aulas + thisMes, 1)}
-              unit="aulas"
-            />
-          )}
+          <h2 id="metas" className="text-[18px] font-bold text-ink">Meta mensal estimada</h2>
+          <MetaBar label="Sessões no mês" current={thisMes} target={metaMes} unit="sessões" />
         </section>
       )}
 

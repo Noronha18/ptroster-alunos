@@ -5,6 +5,7 @@ import { useAluno } from '../hooks/useAluno';
 import { useSessoes } from '../hooks/useSessoes';
 import { useSemana } from '../hooks/useSemana';
 import { BannerAvisos } from '../components/BannerAvisos';
+import { ErroCarregamento } from '../components/ErroCarregamento';
 import { PageLoader } from '../components/PageLoader';
 import { CheckIcon, DumbbellIcon, FlameIcon, TargetIcon } from '../components/icons';
 import { calcularStreak, getUltimos7Dias, resolverCardHoje } from '../utils/dashboard';
@@ -28,8 +29,8 @@ const formatarDataCurta = () => {
 export default function Dashboard() {
   const navigate                                                       = useNavigate();
   const { aluno, planoAtivo, loading }                                       = useAluno();
-  const { sessaoHoje, historico, loadingSessao, buscarSessaoHoje, buscarHistorico } = useSessoes();
-  const { semana, loadingSemana, buscarSemana }                             = useSemana();
+  const { sessaoHoje, historico, loadingSessao, loadingHistorico, erroSessao, erroHistorico, buscarSessaoHoje, buscarHistorico } = useSessoes();
+  const { semana, loadingSemana, erroSemana, buscarSemana }                             = useSemana();
 
   useEffect(() => {
     buscarSessaoHoje();
@@ -44,13 +45,19 @@ export default function Dashboard() {
   const recentes = historico.slice(0, 3);
   const totalEx  = planoAtivo?.treinos?.reduce((a, t) => a + (t.prescricoes?.length ?? 0), 0) ?? 0;
   const metaMes  = (aluno?.frequencia_semanal_plano ?? 0) * 4;
-  const faltam   = metaMes - (aluno?.aulas_feitas_mes ?? 0);
+  const faltam = aluno?.aulas_feitas_mes == null ? null : metaMes - aluno.aulas_feitas_mes;
+  const erroHoje = erroSessao || (!sessaoHoje && erroSemana);
+  const tentarHoje = () => {
+    if (erroSessao) buscarSessaoHoje();
+    if (erroSemana) buscarSemana();
+  };
+  const mostrarSaldo = aluno?.modalidade === 'presencial' && aluno?.tipo_pagamento === 'pacote';
   const card = resolverCardHoje({
     sessaoHoje,
     treinoSugerido: semana?.treino_sugerido_hoje ?? null,
     planoAtivo,
     treinosSemana: semana?.treinos ?? [],
-    carregando: loadingSessao || loadingSemana,
+    carregando: loadingSessao || (!sessaoHoje && loadingSemana),
   });
 
   const diasFeitos = ultimos7.filter(d => d.done).length;
@@ -79,6 +86,13 @@ export default function Dashboard() {
 
       {/* Treino de hoje: a única ação principal da tela */}
       <section className="rounded-2xl bg-surface border border-line p-5" aria-labelledby="treino-hoje">
+        {erroHoje ? (
+          <>
+            <h2 id="treino-hoje" className="mb-3 text-xl font-bold text-ink">Hoje</h2>
+            <ErroCarregamento mensagem={erroHoje} tentarNovamente={tentarHoje} />
+            {planoAtivo && <Link to="/treinos" className="mt-2 inline-flex min-h-11 items-center font-semibold text-primary">Ver treinos</Link>}
+          </>
+        ) : <>
         <p className={`flex items-center gap-1.5 text-[14px] font-semibold ${sessaoHoje ? 'text-primary' : 'text-ink-muted'}`}>
           {sessaoHoje && <CheckIcon />}
           {card.badge}
@@ -101,12 +115,14 @@ export default function Dashboard() {
           />
         </div>
 
+        </>}
+
         {planoAtivo && (
           <dl className="mt-5 pt-4 border-t border-line grid grid-cols-3 gap-3">
             {[
               ['Treinos', planoAtivo.treinos?.length ?? 0],
               ['Exercícios', totalEx],
-              ['Saldo de aulas', aluno?.saldo_aulas ?? '—'],
+              ...(mostrarSaldo ? [['Saldo de aulas', aluno?.saldo_aulas ?? '—']] : []),
             ].map(([rotulo, valor]) => (
               <div key={rotulo}>
                 <dt className="text-[13px] text-ink-muted">{rotulo}</dt>
@@ -117,7 +133,41 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Frequência */}
+      {erroSemana && erroHoje !== erroSemana && (
+        <ErroCarregamento mensagem={erroSemana} tentarNovamente={buscarSemana} />
+      )}
+      {semana?.treinos?.length > 0 && (
+        <section aria-labelledby="semana-progresso">
+          <h3 id="semana-progresso" className="text-[18px] font-semibold text-ink-muted mb-2">Esta semana</h3>
+          <div className="flex flex-wrap gap-2" role="list" aria-label="Progresso semanal por treino">
+            {semana.treinos.map((treino) => {
+              const completo = treino.feitas >= treino.vezes_por_semana;
+              const label = `${treino.treino_nome}: ${treino.feitas} de ${treino.vezes_por_semana} sessões`;
+              return (
+                <span
+                  key={treino.treino_id}
+                  role="listitem"
+                  aria-label={label}
+                  title={label}
+                  className={`flex items-center gap-1.5 max-w-full px-3 py-2 rounded-full text-[14px] font-semibold border ${
+                    completo ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-surface border-line text-ink-muted'
+                  }`}
+                >
+                  {completo && <CheckIcon size={14} />}
+                  <span className="truncate">{treino.treino_nome}</span>
+                  <span className="num shrink-0">{treino.feitas}/{treino.vezes_por_semana}</span>
+                </span>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {erroHistorico ? (
+        <ErroCarregamento mensagem={erroHistorico} tentarNovamente={buscarHistorico} />
+      ) : loadingHistorico ? (
+        <p role="status" className="text-sm text-ink-muted">Carregando frequência…</p>
+      ) : (
       <section aria-labelledby="ultimos-7">
         <div className="flex justify-between items-baseline mb-4">
           <h3 id="ultimos-7" className="text-[18px] font-bold text-ink">Últimos 7 dias</h3>
@@ -135,7 +185,7 @@ export default function Dashboard() {
             <li
               key={i}
               className="flex flex-col items-center gap-1.5"
-              aria-label={`${d.label}: ${d.done ? 'treinou' : 'sem treino'}${d.isToday ? ' (hoje)' : ''}`}
+              aria-label={`${d.label}: ${d.done ? 'com registro' : 'sem registro no recorte'}${d.isToday ? ' (hoje)' : ''}`}
             >
               <span
                 className={`w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold ${
@@ -152,50 +202,26 @@ export default function Dashboard() {
             </li>
           ))}
         </ol>
-
-        {semana?.treinos?.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-[15px] font-semibold text-ink-muted mb-2">Esta semana</h3>
-            <div className="flex flex-wrap gap-2" role="list" aria-label="Progresso semanal por treino">
-              {semana.treinos.map((treino) => {
-                const completo = treino.feitas >= treino.vezes_por_semana;
-                const label = `${treino.treino_nome}: ${treino.feitas} de ${treino.vezes_por_semana} sessões`;
-                return (
-                  <span
-                    key={treino.treino_id}
-                    role="listitem"
-                    aria-label={label}
-                    title={label}
-                    className={`flex items-center gap-1.5 max-w-full px-3 py-2 rounded-full text-[14px] font-semibold border ${
-                      completo ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-surface border-line text-ink-muted'
-                    }`}
-                  >
-                    {completo && <CheckIcon size={14} />}
-                    <span className="truncate">{treino.treino_nome}</span>
-                    <span className="num shrink-0">{treino.feitas}/{treino.vezes_por_semana}</span>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {historico.length >= 30 && <p className="mt-3 text-xs text-ink-muted">Dados das 30 sessões mais recentes.</p>}
       </section>
+
+      )}
 
       {/* Aviso de meta */}
       {faltam > 0 && faltam <= 3 && metaMes > 0 && (
         <p className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-primary/10 border border-primary/25 text-primary text-[15px] font-semibold">
           <TargetIcon />
-          {faltam === 1 ? 'Falta 1 treino' : `Faltam ${faltam} treinos`} para bater a meta do mês.
+          {faltam === 1 ? 'Falta 1 treino' : `Faltam ${faltam} treinos`} para atingir a meta mensal estimada.
         </p>
       )}
 
       {/* Últimas sessões */}
-      {recentes.length > 0 && (
+      {!loadingHistorico && !erroHistorico && recentes.length > 0 && (
         <section aria-labelledby="ultimas-sessoes">
           <div className="flex justify-between items-center">
             <h3 id="ultimas-sessoes" className="text-[18px] font-bold text-ink">Últimas sessões</h3>
             <Link to="/historico" className="press -mr-2 px-2 min-h-11 flex items-center text-[15px] font-semibold text-primary">
-              Ver todas
+              Ver histórico
             </Link>
           </div>
           <ul className="divide-y divide-line border-y border-line">
@@ -207,7 +233,7 @@ export default function Dashboard() {
                 <li key={s.id} className="flex justify-between items-center gap-3 py-3.5">
                   <div className="min-w-0">
                     <p className="text-[16px] font-semibold text-ink truncate">
-                      {s.plano_treino?.titulo ?? 'Sessão Presencial'}
+                      {s.tipo_atividade || (s.treino_id ? 'Treino concluído' : 'Presença registrada')}
                     </p>
                     <p className="text-[14px] text-ink-muted mt-0.5">
                       {semana[d.getDay()]} · {d.getDate()} de {meses[d.getMonth()]}

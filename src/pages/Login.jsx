@@ -11,6 +11,7 @@ const controle = 'min-h-14 [&_input]:text-[17px]';
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [shake, setShake]       = useState(false);
@@ -73,18 +74,24 @@ export default function Login() {
           htmlName="username"
         />
 
-        <TextInput
-          label="Senha"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          size="lg"
-          width="100%"
-          controlClassName={controle}
-          autoComplete="current-password"
-          enterKeyHint="go"
-          htmlName="password"
-        />
+        <div>
+          <TextInput
+            label="Senha"
+            type={mostrarSenha ? 'text' : 'password'}
+            value={password}
+            onChange={setPassword}
+            size="lg"
+            width="100%"
+            controlClassName={controle}
+            autoComplete="current-password"
+            enterKeyHint="go"
+            htmlName="password"
+          />
+          <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)}
+            className="min-h-11 text-sm font-semibold text-primary underline">
+            {mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+          </button>
+        </div>
 
         <Button
           type="submit"
